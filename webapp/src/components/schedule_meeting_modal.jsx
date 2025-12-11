@@ -7,7 +7,8 @@ import 'react-day-picker/dist/style.css';
 const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   // Разделяем дату и время на отдельные состояния
   const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState('');
+  const [selectedHour, setSelectedHour] = useState('');
+  const [selectedMinute, setSelectedMinute] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
   const [duration, setDuration] = useState('60');
   const [meetingTitle, setMeetingTitle] = useState(channel.display_name || channel.name || '');
@@ -30,7 +31,8 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       if (modalRef.current && !modalRef.current.contains(event.target)) {
         // Очистить форму при закрытии
         setSelectedDate(null);
-        setSelectedTime('');
+        setSelectedHour('');
+        setSelectedMinute('');
         setShowCalendar(false);
         setDuration('60');
         setMeetingTitle(channel.display_name || channel.name || '');
@@ -52,7 +54,8 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       if (event.key === 'Escape') {
         // Очистить форму при закрытии
         setSelectedDate(null);
-        setSelectedTime('');
+        setSelectedHour('');
+        setSelectedMinute('');
         setShowCalendar(false);
         setDuration('60');
         setMeetingTitle(channel.display_name || channel.name || '');
@@ -140,6 +143,34 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     setParticipants(participants.filter(p => p.id !== userId));
   };
 
+  // Функция для формирования дат (start_at и start_at_local)
+  const buildDateTimeStrings = (date, hour, minute) => {
+    if (!date || hour === '' || minute === '') {
+      return { startAtUTC: null, startAtLocal: null };
+    }
+
+    const hours = parseInt(hour, 10);
+    const minutes = parseInt(minute, 10);
+    const startAtDate = new Date(date);
+    startAtDate.setHours(hours, minutes, 0, 0);
+    
+    // Формируем строку в формате YYYY-MM-DDTHH:mm:ss+03:00 без перевода в UTC
+    // MSK = UTC+3, поэтому используем +03:00
+    const year = startAtDate.getFullYear();
+    const month = String(startAtDate.getMonth() + 1).padStart(2, '0');
+    const day = String(startAtDate.getDate()).padStart(2, '0');
+    const hoursStr = String(hours).padStart(2, '0');
+    const minutesStr = String(minutes).padStart(2, '0');
+    
+    // Локальное время в формате MSK (+03:00)
+    const startAtLocal = `${year}-${month}-${day}T${hoursStr}:${minutesStr}:00+03:00`;
+    
+    // Также отправляем UTC для обратной совместимости
+    const startAtUTC = startAtDate.toISOString();
+    
+    return { startAtUTC, startAtLocal };
+  };
+
   // Валидация формы
   const validate = () => {
     const newErrors = {};
@@ -161,7 +192,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       }
     }
 
-    if (!selectedTime) {
+    if (selectedHour === '' || selectedMinute === '') {
       newErrors.meetingTime = 'Время обязательно';
     } else if (selectedDate) {
       // Проверка, что выбранное время не в прошлом, если дата сегодня
@@ -171,7 +202,8 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       selectedDateOnly.setHours(0, 0, 0, 0);
       
       if (selectedDateOnly.getTime() === today.getTime()) {
-        const [hours, minutes] = selectedTime.split(':').map(Number);
+        const hours = parseInt(selectedHour, 10);
+        const minutes = parseInt(selectedMinute, 10);
         const selectedDateTime = new Date(selectedDate);
         selectedDateTime.setHours(hours, minutes, 0, 0);
         
@@ -233,24 +265,8 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       // Получить информацию о текущем пользователе
       const userInfo = getCurrentUserInfo();
       
-      // Объединить дату и время в локальное время (MSK +03:00)
-      const [hours, minutes] = selectedTime.split(':').map(Number);
-      const startAtDate = new Date(selectedDate);
-      startAtDate.setHours(hours, minutes, 0, 0);
-      
-      // Формируем строку в формате YYYY-MM-DDTHH:mm:ss+03:00 без перевода в UTC
-      // MSK = UTC+3, поэтому используем +03:00
-      const year = startAtDate.getFullYear();
-      const month = String(startAtDate.getMonth() + 1).padStart(2, '0');
-      const day = String(startAtDate.getDate()).padStart(2, '0');
-      const hoursStr = String(hours).padStart(2, '0');
-      const minutesStr = String(minutes).padStart(2, '0');
-      
-      // Локальное время в формате MSK (+03:00)
-      const startAtLocal = `${year}-${month}-${day}T${hoursStr}:${minutesStr}:00+03:00`;
-      
-      // Также отправляем UTC для обратной совместимости (но не используем в сообщениях)
-      const startAtUTC = startAtDate.toISOString();
+      // Формируем даты используя общую функцию
+      const { startAtUTC, startAtLocal } = buildDateTimeStrings(selectedDate, selectedHour, selectedMinute);
 
       // Подготовить данные для отправки в новом формате
       const requestBody = {
@@ -348,7 +364,8 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       
       // Очистить форму
       setSelectedDate(null);
-      setSelectedTime('');
+      setSelectedHour('');
+      setSelectedMinute('');
       setShowCalendar(false);
       setDuration('60');
       setMeetingTitle(channel.display_name || channel.name || '');
@@ -411,16 +428,90 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     return maxDate;
   };
 
-  // Генерация опций времени с шагом 15 минут
-  const generateTimeOptions = () => {
-    const options = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 15) {
-        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        options.push(timeString);
-      }
+  // Обработчик изменения времени через селекты
+  const handleTimeChange = (hour, minute) => {
+    setSelectedHour(hour);
+    setSelectedMinute(minute);
+    // Очистить ошибку времени при выборе
+    if (errors.meetingTime) {
+      const newErrors = {...errors};
+      delete newErrors.meetingTime;
+      setErrors(newErrors);
     }
-    return options;
+  };
+
+  // Обработчики пресетов времени
+  const applyTimePreset = (presetType) => {
+    const now = new Date();
+    let targetDate = selectedDate;
+    let targetHour = '';
+    let targetMinute = '';
+
+    switch (presetType) {
+      case '15min': {
+        // Через 15 минут: добавляем 15 минут к текущему времени
+        const in15Min = new Date(now.getTime() + 15 * 60 * 1000);
+        // Если дата не выбрана, используем дату из "через 15 минут"
+        if (!selectedDate) {
+          targetDate = new Date(in15Min.getFullYear(), in15Min.getMonth(), in15Min.getDate());
+        }
+        // Время всегда берем из "текущее + 15 минут", округленное до 15 минут
+        targetHour = String(in15Min.getHours()).padStart(2, '0');
+        targetMinute = String(Math.floor(in15Min.getMinutes() / 15) * 15).padStart(2, '0');
+        break;
+      }
+      case '30min': {
+        // Через 30 минут: добавляем 30 минут к текущему времени
+        const in30Min = new Date(now.getTime() + 30 * 60 * 1000);
+        if (!selectedDate) {
+          targetDate = new Date(in30Min.getFullYear(), in30Min.getMonth(), in30Min.getDate());
+        }
+        targetHour = String(in30Min.getHours()).padStart(2, '0');
+        targetMinute = String(Math.floor(in30Min.getMinutes() / 15) * 15).padStart(2, '0');
+        break;
+      }
+      case '1hour': {
+        // Через 1 час: добавляем 1 час к текущему времени
+        const in1Hour = new Date(now.getTime() + 60 * 60 * 1000);
+        if (!selectedDate) {
+          targetDate = new Date(in1Hour.getFullYear(), in1Hour.getMonth(), in1Hour.getDate());
+        }
+        targetHour = String(in1Hour.getHours()).padStart(2, '0');
+        targetMinute = String(Math.floor(in1Hour.getMinutes() / 15) * 15).padStart(2, '0');
+        break;
+      }
+      case '2hours': {
+        // Через 2 часа: добавляем 2 часа к текущему времени
+        const in2Hours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+        if (!selectedDate) {
+          targetDate = new Date(in2Hours.getFullYear(), in2Hours.getMonth(), in2Hours.getDate());
+        }
+        targetHour = String(in2Hours.getHours()).padStart(2, '0');
+        targetMinute = String(Math.floor(in2Hours.getMinutes() / 15) * 15).padStart(2, '0');
+        break;
+      }
+      default:
+        return;
+    }
+
+    // Обновляем состояние
+    if (targetDate && !selectedDate) {
+      setSelectedDate(targetDate);
+    }
+    setSelectedHour(targetHour);
+    setSelectedMinute(targetMinute);
+    
+    // Очистить ошибки
+    if (errors.meetingTime) {
+      const newErrors = {...errors};
+      delete newErrors.meetingTime;
+      setErrors(newErrors);
+    }
+    if (errors.meetingDatetime && targetDate) {
+      const newErrors = {...errors};
+      delete newErrors.meetingDatetime;
+      setErrors(newErrors);
+    }
   };
 
   // Обработчик выбора даты
@@ -595,40 +686,144 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
               )}
             </div>
 
-            {/* Селект времени */}
-            <div>
-              <select
-                value={selectedTime}
-                onChange={(e) => {
-                  setSelectedTime(e.target.value);
-                  // Очистить ошибку времени при выборе
-                  if (errors.meetingTime) {
-                    const newErrors = {...errors};
-                    delete newErrors.meetingTime;
-                    setErrors(newErrors);
-                  }
-                }}
-                required
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  fontSize: '14px',
-                  border: `1px solid ${errors.meetingTime ? 'red' : 'var(--center-channel-color-16, #ccc)'}`,
-                  borderRadius: '4px',
-                  backgroundColor: 'var(--center-channel-bg, #fff)',
-                  color: 'var(--center-channel-color, #000)'
-                }}
-              >
-                <option value="">Выберите время</option>
-                {generateTimeOptions().map(time => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
+            {/* Селекты времени: часы и минуты */}
+            <div style={{marginBottom: '12px'}}>
+              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                <select
+                  value={selectedHour}
+                  onChange={(e) => handleTimeChange(e.target.value, selectedMinute)}
+                  required
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    fontSize: '14px',
+                    border: `1px solid ${errors.meetingTime ? 'red' : 'var(--center-channel-color-16, #ccc)'}`,
+                    borderRadius: '4px',
+                    backgroundColor: 'var(--center-channel-bg, #fff)',
+                    color: 'var(--center-channel-color, #000)'
+                  }}
+                >
+                  <option value="">Час</option>
+                  {Array.from({length: 24}, (_, i) => {
+                    const hour = String(i).padStart(2, '0');
+                    return <option key={hour} value={hour}>{hour}</option>;
+                  })}
+                </select>
+                <span style={{color: 'var(--center-channel-color, #000)', fontSize: '14px'}}>:</span>
+                <select
+                  value={selectedMinute}
+                  onChange={(e) => handleTimeChange(selectedHour, e.target.value)}
+                  required
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    fontSize: '14px',
+                    border: `1px solid ${errors.meetingTime ? 'red' : 'var(--center-channel-color-16, #ccc)'}`,
+                    borderRadius: '4px',
+                    backgroundColor: 'var(--center-channel-bg, #fff)',
+                    color: 'var(--center-channel-color, #000)'
+                  }}
+                >
+                  <option value="">Мин</option>
+                  <option value="00">00</option>
+                  <option value="15">15</option>
+                  <option value="30">30</option>
+                  <option value="45">45</option>
+                </select>
+              </div>
               {errors.meetingTime && (
                 <div style={{color: 'red', fontSize: '12px', marginTop: '4px'}}>
                   {errors.meetingTime}
                 </div>
               )}
+            </div>
+
+            {/* Пресеты времени */}
+            <div style={{
+              marginTop: '8px',
+              padding: '12px',
+              backgroundColor: 'var(--center-channel-color-08, #f5f5f5)',
+              borderRadius: '4px',
+              border: '1px solid var(--center-channel-color-16, #e0e0e0)'
+            }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: 'var(--center-channel-color-64, #666)',
+                marginBottom: '8px'
+              }}>
+                Быстрый выбор
+              </div>
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '6px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => applyTimePreset('15min')}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    border: '1px solid var(--center-channel-color-16, #ccc)',
+                    borderRadius: '4px',
+                    backgroundColor: 'var(--center-channel-bg, #fff)',
+                    color: 'var(--center-channel-color, #000)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Через 15 минут
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyTimePreset('30min')}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    border: '1px solid var(--center-channel-color-16, #ccc)',
+                    borderRadius: '4px',
+                    backgroundColor: 'var(--center-channel-bg, #fff)',
+                    color: 'var(--center-channel-color, #000)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Через 30 минут
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyTimePreset('1hour')}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    border: '1px solid var(--center-channel-color-16, #ccc)',
+                    borderRadius: '4px',
+                    backgroundColor: 'var(--center-channel-bg, #fff)',
+                    color: 'var(--center-channel-color, #000)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Через 1 час
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyTimePreset('2hours')}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    border: '1px solid var(--center-channel-color-16, #ccc)',
+                    borderRadius: '4px',
+                    backgroundColor: 'var(--center-channel-bg, #fff)',
+                    color: 'var(--center-channel-color, #000)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Через 2 часа
+                </button>
+              </div>
             </div>
           </div>
 
@@ -847,7 +1042,8 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
               onClick={() => {
                 // Очистить форму при отмене
                 setSelectedDate(null);
-                setSelectedTime('');
+                setSelectedHour('');
+                setSelectedMinute('');
                 setShowCalendar(false);
                 setDuration('60');
                 setMeetingTitle(channel.display_name || channel.name || '');
