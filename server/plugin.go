@@ -405,16 +405,11 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Validate participants
-	if len(req.ParticipantIDs) == 0 {
-		p.API.LogError("[Kontur] schedule-meeting error: No participants")
-		errors = append(errors, map[string]string{
-			"field":   "participant_ids",
-			"message": "Выберите хотя бы одного участника",
-		})
-	}
+	// Валидация участников будет выполнена после получения канала,
+	// т.к. для DM каналов участник добавляется автоматически
+	// Пока что пропускаем эту валидацию
 
-	// If there are validation errors, return them
+	// If there are validation errors (кроме участников), return them
 	if len(errors) > 0 {
 		p.API.LogError("[Kontur] schedule-meeting error: Validation failed", "error_count", len(errors), "errors", errors)
 		w.Header().Set("Content-Type", "application/json")
@@ -533,54 +528,6 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 		scheduledAtLocalISO = scheduledAtISO
 		endTimeLocalISO = endTimeISO
 	}
-
-	// Get participants info
-	p.API.LogInfo("[Kontur] schedule-meeting: Getting participants", "count", len(req.ParticipantIDs))
-	participants := make([]map[string]interface{}, 0)
-	failedUserIDs := make([]string, 0)
-	for _, userId := range req.ParticipantIDs {
-		p.API.LogInfo("[Kontur] schedule-meeting: Getting user", "user_id", userId)
-		user, err := p.API.GetUser(userId)
-		if err != nil || user == nil {
-			if err != nil {
-				p.API.LogError("[Kontur] schedule-meeting error: Failed to get user", "user_id", userId, "error", err.Error())
-			} else {
-				p.API.LogError("[Kontur] schedule-meeting error: GetUser returned nil", "user_id", userId)
-			}
-			failedUserIDs = append(failedUserIDs, userId)
-			continue
-		}
-
-		participants = append(participants, map[string]interface{}{
-			"user_id":    user.Id,
-			"username":   user.Username,
-			"email":      user.Email,
-			"first_name": user.FirstName,
-			"last_name":  user.LastName,
-		})
-		p.API.LogInfo("[Kontur] schedule-meeting: Got user info", "user_id", userId, "username", user.Username)
-	}
-
-	if len(participants) == 0 {
-		p.API.LogError("[Kontur] schedule-meeting error: No valid participants found", 
-			"requested_count", len(req.ParticipantIDs),
-			"failed_user_ids", failedUserIDs)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		response := map[string]interface{}{
-			"errors": []map[string]string{{
-				"field":   "participant_ids",
-				"message": fmt.Sprintf("Не удалось получить информацию об участниках (запрошено: %d, найдено: 0)", len(req.ParticipantIDs)),
-			}},
-		}
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-	
-	p.API.LogInfo("[Kontur] schedule-meeting: Participants loaded", 
-		"requested_count", len(req.ParticipantIDs),
-		"loaded_count", len(participants),
-		"failed_count", len(failedUserIDs))
 
 	// Get current user - КРИТИЧЕСКОЕ ЛОГИРОВАНИЕ перед вызовом GetUser
 	p.API.LogInfo("[Kontur] schedule-meeting: Getting current user", 
@@ -786,6 +733,161 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 		channelNameForLog = channel.Name
 	}
 	p.API.LogInfo("[Kontur] schedule-meeting: Channel loaded", "channel_id", req.ChannelID, "channel_name", channelNameForLog)
+
+	// Проверяем, является ли канал директом (DM), и автоматически добавляем собеседника
+	// ВАЖНО: Делаем это ДО валидации участников
+	if channel != nil && channel.Type == model.ChannelTypeDirect {
+		p.API.LogInfo("[Kontur] schedule-meeting: Channel is DM, getting other user", 
+			"channel_id", channel.Id,
+			"current_user_id", req.UserID)
+		
+		// Используем метод канала для получения ID другого пользователя
+		// В Mattermost v6+ есть метод GetOtherUserIdForDM на объекте Channel
+		otherUserId := channel.GetOtherUserIdForDM(req.UserID)
+		p.API.LogInfo("[Kontur] schedule-meeting: GetOtherUserIdForDM result",
+			"other_user_id", otherUserId,
+			"other_user_id_empty", otherUserId == "",
+			"other_user_id_length", len(otherUserId),
+			"channel_id", channel.Id,
+			"current_user_id", req.UserID)
+		
+		if otherUserId != "" {
+			p.API.LogInfo("[Kontur] schedule-meeting: Found other user in DM", "other_user_id", otherUserId)
+			// Если список участников пустой, автоматически добавляем собеседника
+			if len(req.ParticipantIDs) == 0 {
+				p.API.LogInfo("[Kontur] schedule-meeting: Participant list is empty, auto-adding other user")
+				req.ParticipantIDs = []string{otherUserId}
+			} else {
+				// Проверяем, есть ли уже этот пользователь в списке
+				found := false
+				for _, pid := range req.ParticipantIDs {
+					if pid == otherUserId {
+						found = true
+						break
+					}
+				}
+				// Если его нет, добавляем
+				if !found {
+					p.API.LogInfo("[Kontur] schedule-meeting: Other user not in list, adding")
+					req.ParticipantIDs = append(req.ParticipantIDs, otherUserId)
+				}
+			}
+		} else {
+			p.API.LogWarn("[Kontur] schedule-meeting: Could not get other user ID from DM channel",
+				"channel_id", channel.Id,
+				"channel_type", channel.Type,
+				"current_user_id", req.UserID)
+		}
+	}
+
+	// Логируем участников перед валидацией
+	p.API.LogInfo("[Kontur] Before validate participants",
+		"channel_type", func() string {
+			if channel != nil {
+				return string(channel.Type)
+			}
+			return "unknown"
+		}(),
+		"user_id", req.UserID,
+		"participant_ids", req.ParticipantIDs,
+		"participant_ids_count", len(req.ParticipantIDs),
+		"participant_ids_detail", fmt.Sprintf("%+v", req.ParticipantIDs))
+
+	// Validate participants (после получения канала и возможного добавления для DM)
+	// Для DM каналов участник уже добавлен автоматически выше
+	if len(req.ParticipantIDs) == 0 {
+		// Проверяем тип канала - если это не DM, то участники обязательны
+		if channel == nil || channel.Type != model.ChannelTypeDirect {
+			validationError := map[string]interface{}{
+				"errors": []map[string]string{{
+					"field":   "participant_ids",
+					"message": "Выберите хотя бы одного участника",
+				}},
+			}
+			p.API.LogError("[Kontur] schedule-meeting validation error: No participants (non-DM)",
+				"errors", fmt.Sprintf("%+v", validationError),
+				"channel_type", func() string {
+					if channel != nil {
+						return string(channel.Type)
+					}
+					return "nil"
+				}())
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(validationError)
+			return
+		} else {
+			// Для DM каналов это не должно произойти, т.к. мы уже добавили otherUserId выше
+			// Но на всякий случай логируем предупреждение
+			validationError := map[string]interface{}{
+				"errors": []map[string]string{{
+					"field":   "participant_ids",
+					"message": "Не удалось определить участника директ-канала",
+				}},
+			}
+			p.API.LogError("[Kontur] schedule-meeting validation error: DM channel but no participants after auto-add",
+				"errors", fmt.Sprintf("%+v", validationError),
+				"channel_id", channel.Id,
+				"channel_type", string(channel.Type),
+				"current_user_id", req.UserID)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(validationError)
+			return
+		}
+	}
+
+	// Get participants info (ПОСЛЕ автодобавления для DM и валидации)
+	p.API.LogInfo("[Kontur] schedule-meeting: Getting participants",
+		"count", len(req.ParticipantIDs),
+		"participant_ids", fmt.Sprintf("%+v", req.ParticipantIDs))
+	participants := make([]map[string]interface{}, 0)
+	failedUserIDs := make([]string, 0)
+	for _, userId := range req.ParticipantIDs {
+		p.API.LogInfo("[Kontur] schedule-meeting: Getting user", "user_id", userId)
+		user, err := p.API.GetUser(userId)
+		if err != nil || user == nil {
+			if err != nil {
+				p.API.LogError("[Kontur] schedule-meeting error: Failed to get user", "user_id", userId, "error", err.Error())
+			} else {
+				p.API.LogError("[Kontur] schedule-meeting error: GetUser returned nil", "user_id", userId)
+			}
+			failedUserIDs = append(failedUserIDs, userId)
+			continue
+		}
+
+		participants = append(participants, map[string]interface{}{
+			"user_id":    user.Id,
+			"username":   user.Username,
+			"email":      user.Email,
+			"first_name": user.FirstName,
+			"last_name":  user.LastName,
+		})
+		p.API.LogInfo("[Kontur] schedule-meeting: Got user info", "user_id", userId, "username", user.Username)
+	}
+
+	if len(participants) == 0 {
+		validationError := map[string]interface{}{
+			"errors": []map[string]string{{
+				"field":   "participant_ids",
+				"message": fmt.Sprintf("Не удалось получить информацию об участниках (запрошено: %d, найдено: 0)", len(req.ParticipantIDs)),
+			}},
+		}
+		p.API.LogError("[Kontur] schedule-meeting validation error: No valid participants found",
+			"errors", fmt.Sprintf("%+v", validationError),
+			"requested_count", len(req.ParticipantIDs),
+			"requested_participant_ids", fmt.Sprintf("%+v", req.ParticipantIDs),
+			"failed_user_ids", failedUserIDs)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(validationError)
+		return
+	}
+	
+	p.API.LogInfo("[Kontur] schedule-meeting: Participants loaded", 
+		"requested_count", len(req.ParticipantIDs),
+		"loaded_count", len(participants),
+		"failed_count", len(failedUserIDs))
 
 	// Get meeting title
 	meetingTitle := ""

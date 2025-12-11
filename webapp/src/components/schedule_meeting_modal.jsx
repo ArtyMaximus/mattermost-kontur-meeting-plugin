@@ -5,6 +5,9 @@ import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 
 const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
+  // Определяем, является ли канал директом (DM)
+  const isDirectChannel = channel && channel.type === 'D';
+  
   // Разделяем дату и время на отдельные состояния
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedHour, setSelectedHour] = useState('');
@@ -221,7 +224,8 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       newErrors.meetingTitle = 'Название не может быть длиннее 100 символов';
     }
 
-    if (participants.length === 0) {
+    // Для DM каналов участники необязательны (собеседник добавляется автоматически на сервере)
+    if (!isDirectChannel && participants.length === 0) {
       newErrors.participants = 'Необходимо выбрать хотя бы одного участника';
     }
 
@@ -914,7 +918,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
               fontWeight: '600',
               color: 'var(--center-channel-color, #000)'
             }}>
-              Участники <span style={{color: 'red'}}>*</span>
+              Участники {!isDirectChannel && <span style={{color: 'red'}}>*</span>}
             </label>
             
             {/* Поиск участников */}
@@ -1024,7 +1028,9 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
               </div>
             )}
             <div style={{color: 'var(--center-channel-color-64, #666)', fontSize: '12px', marginTop: '4px'}}>
-              Выберите участников через поиск (можно искать по username, имени, фамилии)
+              {isDirectChannel 
+                ? 'Собеседник директ-канала будет добавлен автоматически. Вы можете добавить дополнительных участников через поиск.'
+                : 'Выберите участников через поиск (можно искать по username, имени, фамилии)'}
             </div>
           </div>
 
