@@ -110,7 +110,11 @@ class KonturMeetingPlugin {
    * @param {Object} channel - Current channel object
    */
   async handleCreateMeeting(channel) {
-    console.log('[Kontur] Создание встречи для канала', channel);
+    console.log('[Kontur] Кнопка нажата:', {
+      channel: channel.display_name || channel.name,
+      channelId: channel.id,
+      channelType: channel.type
+    });
 
     try {
       // Check if webhook URL is configured
@@ -132,19 +136,27 @@ class KonturMeetingPlugin {
         return;
       }
 
-      console.log('[Kontur] Текущий пользователь:', currentUser);
+      console.log('[Kontur] Текущий пользователь:', {
+        id: currentUser.id,
+        username: currentUser.username,
+        email: currentUser.email || '(не указан)'
+      });
 
       // Prepare webhook payload
       const webhookPayload = {
+        operation_type: 'instant_call',  // Тип операции: быстрый созвон
         channel_id: channel.id,
-        channel_name: channel.display_name,
+        channel_name: channel.display_name || channel.name,
         channel_type: channel.type,
         user_id: currentUserId,
-        username: currentUser.username
+        username: currentUser.username,
+        user_email: currentUser.email || null,  // Email может быть не заполнен
+        timestamp: new Date().toISOString()
       };
 
+      console.log('[Kontur] Создание быстрого созвона (instant_call)');
       console.log('[Kontur] Отправка запроса к вебхуку:', webhookURL);
-      console.log('[Kontur] Данные запроса:', webhookPayload);
+      console.log('[Kontur] Payload:', JSON.stringify(webhookPayload, null, 2));
 
       // Send request to webhook to create meeting
       const webhookResponse = await fetch(webhookURL, {
@@ -162,12 +174,19 @@ class KonturMeetingPlugin {
       const webhookData = await webhookResponse.json();
       console.log('[Kontur] Ответ от вебхука:', webhookData);
 
-      // Check if room_url is present in response
-      if (!webhookData.room_url) {
-        throw new Error('Некорректный ответ от вебхука. Отсутствует поле room_url.');
+      // Check if meeting_url or room_url is present in response
+      const roomUrl = webhookData.meeting_url || webhookData.room_url;
+      
+      if (!roomUrl) {
+        // Если нет URL, но есть success: true, просто показываем сообщение
+        if (webhookData.success) {
+          alert('✅ Комната Kontur.Talk создана!');
+          return;
+        }
+        console.warn('[Kontur] Неожиданный ответ от вебхука:', webhookData);
+        alert('✅ Запрос отправлен.');
+        return;
       }
-
-      const roomUrl = webhookData.room_url;
 
       // Create post in the channel
       const postPayload = {
@@ -202,7 +221,10 @@ class KonturMeetingPlugin {
       }
 
     } catch (error) {
-      console.error('[Kontur] Ошибка при создании встречи', error);
+      console.error('[Kontur] Ошибка при создании быстрого созвона:', {
+        message: error.message,
+        stack: error.stack
+      });
       
       // Show user-friendly error messages
       let errorMessage = '❌ Не удалось создать встречу.\n\n';
