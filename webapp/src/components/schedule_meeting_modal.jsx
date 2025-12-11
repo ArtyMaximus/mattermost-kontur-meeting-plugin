@@ -3,6 +3,15 @@ import PropTypes from 'prop-types';
 // Импортируем только DayPicker для минимизации размера бандла
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
+import { formatErrorMessage, getCurrentUserInfo } from '../utils/helpers.js';
+import { DEFAULT_TIMEZONE, REQUEST_FIELDS, ERROR_FIELD_MAP } from '../utils/constants.js';
+import { logger } from '../utils/logger.js';
+import { 
+  DurationSelector, 
+  ParticipantSelector,
+  TimeSelector,
+  TimePresets
+} from './modal_components.jsx';
 
 const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   // Определяем, является ли канал директом (DM)
@@ -27,20 +36,24 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   const searchTimeoutRef = useRef(null);
   const calendarRef = useRef(null);
 
+  // Helper function to reset form state
+  const resetForm = () => {
+    setSelectedDate(null);
+    setSelectedHour('');
+    setSelectedMinute('');
+    setShowCalendar(false);
+    setDuration('60');
+    setMeetingTitle(channel.display_name || channel.name || '');
+    setParticipants([]);
+    setErrors({});
+  };
+
   // Закрытие при клике вне модального окна (по фону)
   useEffect(() => {
     const handleClickOutside = (event) => {
       // Закрывать только если клик по фону (не по содержимому модалки)
       if (modalRef.current && !modalRef.current.contains(event.target)) {
-        // Очистить форму при закрытии
-        setSelectedDate(null);
-        setSelectedHour('');
-        setSelectedMinute('');
-        setShowCalendar(false);
-        setDuration('60');
-        setMeetingTitle(channel.display_name || channel.name || '');
-        setParticipants([]);
-        setErrors({});
+        resetForm();
         onClose();
       }
     };
@@ -55,15 +68,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   useEffect(() => {
     const handleEscape = (event) => {
       if (event.key === 'Escape') {
-        // Очистить форму при закрытии
-        setSelectedDate(null);
-        setSelectedHour('');
-        setSelectedMinute('');
-        setShowCalendar(false);
-        setDuration('60');
-        setMeetingTitle(channel.display_name || channel.name || '');
-        setParticipants([]);
-        setErrors({});
+        resetForm();
         onClose();
       }
     };
@@ -112,7 +117,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
           setSearchResults([]);
         }
       } catch (error) {
-        console.error('[Kontur] Ошибка поиска пользователей:', error);
+        logger.error('Ошибка поиска пользователей:', error);
         setSearchResults([]);
       } finally {
         setIsSearching(false);
@@ -234,25 +239,74 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   };
 
   // Получить текущего пользователя и team_id из Redux store
-  const getCurrentUserInfo = () => {
-    // Получаем доступ к store через window.KonturMeetingPlugin
-    if (window.KonturMeetingPlugin && window.KonturMeetingPlugin.store) {
-      const state = window.KonturMeetingPlugin.store.getState();
-      const currentUserId = state.entities.users.currentUserId;
-      const currentUser = state.entities.users.profiles[currentUserId];
-      const currentTeamId = state.entities.teams.currentTeamId;
+  const getUserInfo = () => {
+    return getCurrentUserInfo(channel);
+  };
+
+  // Helper function to build request payload
+  const buildScheduleRequest = () => {
+    const userInfo = getUserInfo();
+    const { startAtUTC, startAtLocal } = buildDateTimeStrings(selectedDate, selectedHour, selectedMinute);
+
+    return {
+      [REQUEST_FIELDS.CHANNEL_ID]: channel.id,
+      [REQUEST_FIELDS.TEAM_ID]: userInfo.team_id,
+      [REQUEST_FIELDS.USER_ID]: userInfo.user_id,
+      [REQUEST_FIELDS.START_AT]: startAtUTC,
+      [REQUEST_FIELDS.START_AT_LOCAL]: startAtLocal,
+      [REQUEST_FIELDS.TIMEZONE]: DEFAULT_TIMEZONE,
+      [REQUEST_FIELDS.DURATION_MINUTES]: parseInt(duration, 10),
+      [REQUEST_FIELDS.TITLE]: meetingTitle.trim() || null,
+      [REQUEST_FIELDS.PARTICIPANT_IDS]: participants.map(p => p.id)
+    };
+  };
+
+  // Helper function to handle API errors
+  const handleApiError = async (response) => {
+    let result;
+    try {
+      const text = await response.text();
+      if (!text) {
+        throw new Error('Пустой ответ от сервера');
+      }
+      result = JSON.parse(text);
+    } catch (parseError) {
+      console.error('[Kontur] Ошибка парсинга ответа:', parseError);
+      throw new Error(`Неверный ответ от сервера (статус ${response.status}): ${parseError.message}`);
+    }
+
+    // Handle validation errors
+    if (result.errors && Array.isArray(result.errors)) {
+      const validationErrors = {};
+      let generalError = null;
       
-      return {
-        user_id: currentUserId,
-        team_id: currentTeamId || channel.team_id || ''
-      };
+          result.errors.forEach(error => {
+            if (error.field) {
+              const mappedField = ERROR_FIELD_MAP[error.field] || error.field;
+          
+          if (mappedField === 'general') {
+            generalError = error.message;
+          } else {
+            validationErrors[mappedField] = error.message;
+          }
+        }
+      });
+      
+      if (Object.keys(validationErrors).length > 0) {
+        setErrors(validationErrors);
+        return;
+      }
+      
+      if (generalError) {
+        throw new Error(generalError);
+      }
     }
     
-    // Fallback: попробовать получить из channel
-    return {
-      user_id: '',
-      team_id: channel.team_id || ''
-    };
+    if (result.message) {
+      throw new Error(result.message);
+    }
+    
+    throw new Error(`Не удалось создать встречу (статус ${response.status})`);
   };
 
   // Отправка формы
@@ -266,26 +320,9 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     setIsSubmitting(true);
 
     try {
-      // Получить информацию о текущем пользователе
-      const userInfo = getCurrentUserInfo();
-      
-      // Формируем даты используя общую функцию
-      const { startAtUTC, startAtLocal } = buildDateTimeStrings(selectedDate, selectedHour, selectedMinute);
+      const requestBody = buildScheduleRequest();
 
-      // Подготовить данные для отправки в новом формате
-      const requestBody = {
-        channel_id: channel.id,
-        team_id: userInfo.team_id,
-        user_id: userInfo.user_id,
-        start_at: startAtUTC, // Для обратной совместимости
-        start_at_local: startAtLocal, // Локальное время MSK
-        timezone: 'Europe/Moscow', // Часовой пояс (строка в одинарных кавычках - это корректно для JS)
-        duration_minutes: parseInt(duration, 10),
-        title: meetingTitle.trim() || null,
-        participant_ids: participants.map(p => p.id)
-      };
-
-      console.log('[Kontur] Отправка запроса на создание встречи:', requestBody);
+      logger.log('Отправка запроса на создание встречи:', requestBody);
 
       const response = await fetch('/plugins/com.skyeng.kontur-meeting/api/schedule-meeting', {
         method: 'POST',
@@ -297,123 +334,32 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
         body: JSON.stringify(requestBody)
       });
 
-      let result;
-      try {
-        const text = await response.text();
-        if (!text) {
-          throw new Error('Пустой ответ от сервера');
-        }
-        result = JSON.parse(text);
-      } catch (parseError) {
-        console.error('[Kontur] Ошибка парсинга ответа:', parseError);
-        throw new Error(`Неверный ответ от сервера (статус ${response.status}): ${parseError.message}`);
-      }
-
       if (!response.ok) {
         console.error('[Kontur] Ошибка от сервера:', {
           status: response.status,
-          statusText: response.statusText,
-          result: result
+          statusText: response.statusText
         });
         
-        // Обработка ошибок валидации
-        if (result.errors && Array.isArray(result.errors)) {
-          const validationErrors = {};
-          let generalError = null;
-          
-          result.errors.forEach(error => {
-            if (error.field) {
-              // Маппинг полей для отображения ошибок
-              const fieldMap = {
-                'start_at': 'meetingDatetime',
-                'start_at_local': 'meetingDatetime',
-                'duration_minutes': 'duration',
-                'title': 'meetingTitle',
-                'participant_ids': 'participants',
-                'general': 'general'
-              };
-              const mappedField = fieldMap[error.field] || error.field;
-              
-              if (mappedField === 'general') {
-                generalError = error.message;
-              } else {
-                validationErrors[mappedField] = error.message;
-              }
-            }
-          });
-          
-          // Если есть ошибки валидации полей, показываем их
-          if (Object.keys(validationErrors).length > 0) {
-            setErrors(validationErrors);
-            return;
-          }
-          
-          // Если только общая ошибка, показываем её
-          if (generalError) {
-            throw new Error(generalError);
-          }
-        }
-        
-        // Если есть message в result, используем его
-        if (result.message) {
-          throw new Error(result.message);
-        }
-        
-        // Иначе формируем сообщение из статуса
-        throw new Error(`Не удалось создать встречу (статус ${response.status})`);
+        await handleApiError(response);
+        return;
       }
 
-      // Успех - закрыть модалку и очистить форму
-      console.log('[Kontur] Meeting scheduled successfully');
+      // Success
+      logger.log('Meeting scheduled successfully');
       
-      // Очистить форму
-      setSelectedDate(null);
-      setSelectedHour('');
-      setSelectedMinute('');
-      setShowCalendar(false);
-      setDuration('60');
-      setMeetingTitle(channel.display_name || channel.name || '');
-      setParticipants([]);
-      setErrors({});
+      resetForm();
       
       if (onSuccess) {
         onSuccess();
       }
       
-      // Закрыть модалку
       onClose();
 
     } catch (error) {
-      console.error('[Kontur] Ошибка при создании встречи:', error);
+      logger.error('Ошибка при создании встречи:', error);
       
-      // Формируем детальное сообщение об ошибке, аналогично handleInstantCall
-      const errorText = error.message || '';
-      let errorMessage;
-      
-      // Проверяем, содержит ли ошибка детальное сообщение от сервера о проблеме с вебхуком
-      if (errorText.includes('🔌 Не удалось подключиться к вебхуку')) {
-        // Сервер уже вернул детальное сообщение, используем его полностью
-        errorMessage = errorText;
-      } else if (errorText.includes('Не удалось подключиться к вебхуку') || 
-                 errorText.includes('Failed to fetch') || 
-                 errorText.includes('ERR_CONNECTION_REFUSED')) {
-        // Формируем детальное сообщение сами
-        errorMessage = '❌ Не удалось создать встречу.\n\n';
-        errorMessage += '🔌 Не удалось подключиться к вебхуку:\n';
-        // Пытаемся получить URL из конфигурации
-        const webhookURL = (window.KonturMeetingPlugin && window.KonturMeetingPlugin.config && window.KonturMeetingPlugin.config.WebhookURL) || 'URL не настроен';
-        errorMessage += webhookURL;
-        errorMessage += '\n\nПроверьте:\n';
-        errorMessage += '1. n8n запущен и доступен\n';
-        errorMessage += '2. Workflow активирован\n';
-        errorMessage += '3. URL указан правильно';
-      } else if (errorText.includes('Вебхук вернул ошибку')) {
-        errorMessage = '❌ Не удалось создать встречу.\n\n';
-        errorMessage += '⚠️ Вебхук вернул ошибку. Проверьте логи workflow в n8n.';
-      } else {
-        errorMessage = '❌ Не удалось создать встречу.\n\n' + errorText;
-      }
-      
+      const config = window.KonturMeetingPlugin && window.KonturMeetingPlugin.config;
+      const errorMessage = formatErrorMessage(error, config);
       alert(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -690,187 +636,23 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
               )}
             </div>
 
-            {/* Селекты времени: часы и минуты */}
-            <div style={{marginBottom: '12px'}}>
-              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                <select
-                  value={selectedHour}
-                  onChange={(e) => handleTimeChange(e.target.value, selectedMinute)}
-                  required
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    fontSize: '14px',
-                    border: `1px solid ${errors.meetingTime ? 'red' : 'var(--center-channel-color-16, #ccc)'}`,
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--center-channel-bg, #fff)',
-                    color: 'var(--center-channel-color, #000)'
-                  }}
-                >
-                  <option value="">Час</option>
-                  {Array.from({length: 24}, (_, i) => {
-                    const hour = String(i).padStart(2, '0');
-                    return <option key={hour} value={hour}>{hour}</option>;
-                  })}
-                </select>
-                <span style={{color: 'var(--center-channel-color, #000)', fontSize: '14px'}}>:</span>
-                <select
-                  value={selectedMinute}
-                  onChange={(e) => handleTimeChange(selectedHour, e.target.value)}
-                  required
-                  style={{
-                    flex: 1,
-                    padding: '8px 12px',
-                    fontSize: '14px',
-                    border: `1px solid ${errors.meetingTime ? 'red' : 'var(--center-channel-color-16, #ccc)'}`,
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--center-channel-bg, #fff)',
-                    color: 'var(--center-channel-color, #000)'
-                  }}
-                >
-                  <option value="">Мин</option>
-                  <option value="00">00</option>
-                  <option value="15">15</option>
-                  <option value="30">30</option>
-                  <option value="45">45</option>
-                </select>
-              </div>
-              {errors.meetingTime && (
-                <div style={{color: 'red', fontSize: '12px', marginTop: '4px'}}>
-                  {errors.meetingTime}
-                </div>
-              )}
-            </div>
+            {/* Селекты времени и пресеты */}
+            <TimeSelector 
+              selectedHour={selectedHour}
+              selectedMinute={selectedMinute}
+              handleTimeChange={handleTimeChange}
+              errors={errors}
+            />
 
-            {/* Пресеты времени */}
-            <div style={{
-              marginTop: '8px',
-              padding: '12px',
-              backgroundColor: 'var(--center-channel-color-08, #f5f5f5)',
-              borderRadius: '4px',
-              border: '1px solid var(--center-channel-color-16, #e0e0e0)'
-            }}>
-              <div style={{
-                fontSize: '12px',
-                fontWeight: '600',
-                color: 'var(--center-channel-color-64, #666)',
-                marginBottom: '8px'
-              }}>
-                Быстрый выбор
-              </div>
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '6px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => applyTimePreset('15min')}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    border: '1px solid var(--center-channel-color-16, #ccc)',
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--center-channel-bg, #fff)',
-                    color: 'var(--center-channel-color, #000)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  Через 15 минут
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyTimePreset('30min')}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    border: '1px solid var(--center-channel-color-16, #ccc)',
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--center-channel-bg, #fff)',
-                    color: 'var(--center-channel-color, #000)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  Через 30 минут
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyTimePreset('1hour')}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    border: '1px solid var(--center-channel-color-16, #ccc)',
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--center-channel-bg, #fff)',
-                    color: 'var(--center-channel-color, #000)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  Через 1 час
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyTimePreset('2hours')}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    border: '1px solid var(--center-channel-color-16, #ccc)',
-                    borderRadius: '4px',
-                    backgroundColor: 'var(--center-channel-bg, #fff)',
-                    color: 'var(--center-channel-color, #000)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  Через 2 часа
-                </button>
-              </div>
-            </div>
+            <TimePresets applyTimePreset={applyTimePreset} />
           </div>
 
           {/* Продолжительность */}
-          <div style={{marginBottom: '20px'}}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: 'var(--center-channel-color, #000)'
-            }}>
-              Продолжительность <span style={{color: 'red'}}>*</span>
-            </label>
-            <select
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              required
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                fontSize: '14px',
-                border: `1px solid ${errors.duration ? 'red' : 'var(--center-channel-color-16, #ccc)'}`,
-                borderRadius: '4px',
-                backgroundColor: 'var(--center-channel-bg, #fff)',
-                color: 'var(--center-channel-color, #000)'
-              }}
-            >
-              <option value="15">15 минут</option>
-              <option value="30">30 минут</option>
-              <option value="45">45 минут</option>
-              <option value="60">1 час</option>
-              <option value="90">1.5 часа</option>
-              <option value="120">2 часа</option>
-              <option value="180">3 часа</option>
-              <option value="240">4 часа</option>
-            </select>
-            {errors.duration && (
-              <div style={{color: 'red', fontSize: '12px', marginTop: '4px'}}>
-                {errors.duration}
-              </div>
-            )}
-          </div>
+          <DurationSelector 
+            duration={duration}
+            setDuration={setDuration}
+            errors={errors}
+          />
 
           {/* Название встречи */}
           <div style={{marginBottom: '20px'}}>
@@ -910,129 +692,17 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
           </div>
 
           {/* Участники */}
-          <div style={{marginBottom: '20px'}}>
-            <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
-              fontWeight: '600',
-              color: 'var(--center-channel-color, #000)'
-            }}>
-              Участники {!isDirectChannel && <span style={{color: 'red'}}>*</span>}
-            </label>
-            
-            {/* Поиск участников */}
-            <div style={{position: 'relative', marginBottom: '8px'}}>
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={participantSearch}
-                onChange={(e) => setParticipantSearch(e.target.value)}
-                placeholder="Начните вводить имя пользователя..."
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  fontSize: '14px',
-                  border: `1px solid ${errors.participants ? 'red' : 'var(--center-channel-color-16, #ccc)'}`,
-                  borderRadius: '4px',
-                  backgroundColor: 'var(--center-channel-bg, #fff)',
-                  color: 'var(--center-channel-color, #000)'
-                }}
-              />
-              
-              {/* Результаты поиска */}
-              {searchResults.length > 0 && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  marginTop: '4px',
-                  backgroundColor: 'var(--center-channel-bg, #fff)',
-                  border: '1px solid var(--center-channel-color-16, #ccc)',
-                  borderRadius: '4px',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                  maxHeight: '200px',
-                  overflow: 'auto',
-                  zIndex: 1000
-                }}>
-                  {searchResults.map(user => (
-                    <div
-                      key={user.id}
-                      onClick={() => addParticipant(user)}
-                      style={{
-                        padding: '8px 12px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid var(--center-channel-color-16, #eee)',
-                        color: 'var(--center-channel-color, #000)'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--center-channel-color-08, #f0f0f0)'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      {user.username} {user.first_name && user.last_name && `(${user.first_name} ${user.last_name})`}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Выбранные участники */}
-            {participants.length > 0 && (
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '8px',
-                marginTop: '8px'
-              }}>
-                {participants.map(participant => (
-                  <div
-                    key={participant.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '4px 8px',
-                      backgroundColor: 'var(--center-channel-color-08, #f0f0f0)',
-                      borderRadius: '4px',
-                      fontSize: '14px'
-                    }}
-                  >
-                    <span>{participant.username}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeParticipant(participant.id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--center-channel-color, #000)',
-                        fontSize: '16px',
-                        padding: 0,
-                        width: '20px',
-                        height: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {errors.participants && (
-              <div style={{color: 'red', fontSize: '12px', marginTop: '4px'}}>
-                {errors.participants}
-              </div>
-            )}
-            <div style={{color: 'var(--center-channel-color-64, #666)', fontSize: '12px', marginTop: '4px'}}>
-              {isDirectChannel 
-                ? 'Собеседник директ-канала будет добавлен автоматически. Вы можете добавить дополнительных участников через поиск.'
-                : 'Выберите участников через поиск (можно искать по username, имени, фамилии)'}
-            </div>
-          </div>
+          <ParticipantSelector 
+            isDirectChannel={isDirectChannel}
+            participantSearch={participantSearch}
+            setParticipantSearch={setParticipantSearch}
+            searchResults={searchResults}
+            addParticipant={addParticipant}
+            participants={participants}
+            removeParticipant={removeParticipant}
+            errors={errors}
+            searchInputRef={searchInputRef}
+          />
 
           {/* Кнопки */}
           <div style={{
@@ -1046,15 +716,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
             <button
               type="button"
               onClick={() => {
-                // Очистить форму при отмене
-                setSelectedDate(null);
-                setSelectedHour('');
-                setSelectedMinute('');
-                setShowCalendar(false);
-                setDuration('60');
-                setMeetingTitle(channel.display_name || channel.name || '');
-                setParticipants([]);
-                setErrors({});
+                resetForm();
                 onClose();
               }}
               disabled={isSubmitting}
@@ -1078,8 +740,8 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
                 fontSize: '14px',
                 border: 'none',
                 borderRadius: '4px',
-              backgroundColor: isSubmitting ? 'var(--center-channel-color-32, #999)' : 'var(--button-bg, #2389D7)',
-              color: 'var(--button-color, #fff)',
+                backgroundColor: isSubmitting ? 'var(--center-channel-color-32, #999)' : 'var(--button-bg, #2389D7)',
+                color: 'var(--button-color, #fff)',
                 cursor: isSubmitting ? 'not-allowed' : 'pointer',
                 fontWeight: '600'
               }}

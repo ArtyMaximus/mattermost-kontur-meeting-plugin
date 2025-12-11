@@ -53,7 +53,7 @@ Write-Host "Building for Linux amd64..." -ForegroundColor Cyan
 $env:CGO_ENABLED="0"
 $env:GOOS="linux"
 $env:GOARCH="amd64"
-go build -o "dist/plugin-linux-amd64" plugin.go
+go build -o "dist/plugin-linux-amd64" .
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to build server for Linux" -ForegroundColor Red
     Pop-Location
@@ -65,7 +65,7 @@ Write-Host "Building for Windows amd64..." -ForegroundColor Cyan
 $env:CGO_ENABLED="0"
 $env:GOOS="windows"
 $env:GOARCH="amd64"
-go build -o "dist/plugin-windows-amd64.exe" plugin.go
+go build -o "dist/plugin-windows-amd64.exe" .
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to build server for Windows" -ForegroundColor Red
     Pop-Location
@@ -77,7 +77,7 @@ Write-Host "Building for macOS amd64..." -ForegroundColor Cyan
 $env:CGO_ENABLED="0"
 $env:GOOS="darwin"
 $env:GOARCH="amd64"
-go build -o "dist/plugin-darwin-amd64" plugin.go
+go build -o "dist/plugin-darwin-amd64" .
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to build server for macOS Intel" -ForegroundColor Red
     Pop-Location
@@ -89,7 +89,7 @@ Write-Host "Building for macOS arm64..." -ForegroundColor Cyan
 $env:CGO_ENABLED="0"
 $env:GOOS="darwin"
 $env:GOARCH="arm64"
-go build -o "dist/plugin-darwin-arm64" plugin.go
+go build -o "dist/plugin-darwin-arm64" .
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Failed to build server for macOS Apple Silicon" -ForegroundColor Red
     Pop-Location

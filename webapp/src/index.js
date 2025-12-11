@@ -1,13 +1,20 @@
 // Статический импорт модалки для включения в основной бандл
 import ScheduleMeetingModal from './components/schedule_meeting_modal.jsx';
+import KonturMeetingDropdown from './components/kontur_meeting_dropdown.jsx';
+import { formatErrorMessage } from './utils/helpers.js';
+import KonturIcon from './components/kontur_icon.jsx';
+import { logger } from './utils/logger.js';
 
 class KonturMeetingPlugin {
   constructor() {
     this.config = null;
     // Экспортировать методы для доступа из компонента
     window.KonturMeetingPlugin = this;
-    this.currentDropdown = null;
-    this.dropdownCloseHandler = null;
+    // Dropdown state (React-based)
+    this.isDropdownOpen = false;
+    this.dropdownChannel = null;
+    this.dropdownContainer = null;
+    // Modal state (React-based)
     this.modalContainer = null;
     this.currentModal = null;
     this.isModalOpen = false;
@@ -20,7 +27,7 @@ class KonturMeetingPlugin {
    * @param {Object} store - Redux store
    */
   async initialize(registry, store) {
-    console.log('[Kontur] Инициализация плагина...');
+    logger.log('Инициализация плагина...');
     
     this.store = store;
     this.registry = registry;
@@ -28,60 +35,35 @@ class KonturMeetingPlugin {
     // Load plugin configuration
     try {
       await this.loadConfig();
-      console.log('[Kontur] Конфигурация загружена', this.config);
+      logger.log('Конфигурация загружена', this.config);
     } catch (error) {
-      console.error('[Kontur] Ошибка загрузки конфигурации', error);
+      logger.error('Ошибка загрузки конфигурации', error);
     }
 
-    // Create SVG icon for channel header button
-    // React доступен глобально в Mattermost через window.React
+    // Create icon for channel header button
     let icon;
     try {
       if (window.React && window.React.createElement) {
-        icon = window.React.createElement(
-        'svg',
-        {
-          width: 20,
-          height: 20,
-          viewBox: '0 0 32 32',
-          xmlns: 'http://www.w3.org/2000/svg',
-          fill: 'currentColor',
-          style: { display: 'block' }
-        },
-        [
-            window.React.createElement('path', {
-            key: 'path1',
-            d: 'M0 0 C0.804375 -0.00128906 1.60875 -0.00257813 2.4375 -0.00390625 C3.283125 -0.00003906 4.12875 0.00382813 5 0.0078125 C6.2684375 0.00201172 6.2684375 0.00201172 7.5625 -0.00390625 C8.366875 -0.00261719 9.17125 -0.00132812 10 0 C10.7425 0.00112793 11.485 0.00225586 12.25 0.00341797 C14 0.1328125 14 0.1328125 15 1.1328125 C15.09909302 3.46441305 15.12970504 5.79911192 15.125 8.1328125 C15.12886719 10.0509375 15.12886719 10.0509375 15.1328125 12.0078125 C15 15.1328125 15 15.1328125 14 16.1328125 C12.66956375 16.2311846 11.33406656 16.26359842 10 16.265625 C9.195625 16.26691406 8.39125 16.26820312 7.5625 16.26953125 C6.716875 16.26566406 5.87125 16.26179688 5 16.2578125 C4.154375 16.26167969 3.30875 16.26554687 2.4375 16.26953125 C1.633125 16.26824219 0.82875 16.26695313 0 16.265625 C-0.7425 16.26449707 -1.485 16.26336914 -2.25 16.26220703 C-4 16.1328125 -4 16.1328125 -5 15.1328125 C-5.09909302 12.80121195 -5.12970504 10.46651308 -5.125 8.1328125 C-5.12757813 6.8540625 -5.13015625 5.5753125 -5.1328125 4.2578125 C-4.94045167 -0.26832466 -4.12700187 0.00626932 0 0 Z',
-            fill: 'currentColor',
-            transform: 'translate(5,7.8671875)'
-          }),
-            window.React.createElement('path', {
-            key: 'path2',
-            d: 'M0 0 C0 4.62 0 9.24 0 14 C-6.625 13.25 -6.625 13.25 -10 11 C-10.64282362 5.93776401 -10.64282362 5.93776401 -10 3 C-6.51174019 -0.18926611 -4.86864834 0 0 0 Z',
-            fill: 'currentColor',
-            transform: 'translate(32,9)'
-          })
-        ]
-      );
+        icon = window.React.createElement(KonturIcon, { size: 20 });
       } else {
         throw new Error('React not available');
       }
     } catch (error) {
-      console.warn('[Kontur] SVG icon failed, using Font Awesome fallback:', error);
+      logger.warn('SVG icon failed, using Font Awesome fallback:', error);
       icon = 'fa fa-video-camera';
     }
 
-    // Register channel header button - opens dropdown menu
+    // Register channel header button - opens React dropdown component
     registry.registerChannelHeaderButtonAction(
       icon,
       (channel, channelMember) => {
-        this.showMeetingDropdown(channel);
+        this.openDropdown(channel, channelMember);
       },
       'Создать встречу Kontur.Talk',
       'kontur-meeting-button'
     );
 
-    console.log('[Kontur] Плагин инициализирован успешно');
+    logger.log('Плагин инициализирован успешно');
   }
 
   /**
@@ -112,9 +94,9 @@ class KonturMeetingPlugin {
         this.config.OpenInNewTab = this.config.open_in_new_tab;
       }
       
-      console.log('[Kontur] Конфигурация получена от сервера', this.config);
+      logger.log('Конфигурация получена от сервера', this.config);
     } catch (error) {
-      console.error('[Kontur] Ошибка загрузки конфигурации', error);
+      logger.error('Ошибка загрузки конфигурации', error);
       this.config = { 
         WebhookURL: '',
         OpenInNewTab: true
@@ -127,7 +109,7 @@ class KonturMeetingPlugin {
    * @param {Object} channel - Current channel object
    */
   async handleInstantCall(channel) {
-    console.log('[Kontur] Создание мгновенной встречи:', {
+    logger.log('Создание мгновенной встречи:', {
       channel: channel.display_name || channel.name,
       channelId: channel.id,
       channelType: channel.type
@@ -149,11 +131,11 @@ class KonturMeetingPlugin {
 
       if (!currentUser) {
         alert('❌ Не удалось получить информацию о текущем пользователе');
-        console.error('[Kontur] Текущий пользователь не найден в store');
+        logger.error('Текущий пользователь не найден в store');
         return;
       }
 
-      console.log('[Kontur] Текущий пользователь:', {
+      logger.log('Текущий пользователь:', {
         id: currentUser.id,
         username: currentUser.username,
         email: currentUser.email || '(не указан)'
@@ -171,9 +153,9 @@ class KonturMeetingPlugin {
         timestamp: new Date().toISOString()
       };
 
-      console.log('[Kontur] Создание быстрого созвона (instant_call)');
-      console.log('[Kontur] Отправка запроса к вебхуку:', webhookURL);
-      console.log('[Kontur] Payload:', JSON.stringify(webhookPayload, null, 2));
+      logger.log('Создание быстрого созвона (instant_call)');
+      logger.log('Отправка запроса к вебхуку:', webhookURL);
+      logger.log('Payload:', JSON.stringify(webhookPayload, null, 2));
 
       // Send request to webhook to create meeting
       const webhookResponse = await fetch(webhookURL, {
@@ -189,7 +171,7 @@ class KonturMeetingPlugin {
       }
 
       const webhookData = await webhookResponse.json();
-      console.log('[Kontur] Ответ от вебхука:', webhookData);
+      logger.log('Ответ от вебхука:', webhookData);
 
       // Check if meeting_url or room_url is present in response
       const roomUrl = webhookData.meeting_url || webhookData.room_url;
@@ -200,7 +182,7 @@ class KonturMeetingPlugin {
           alert('✅ Комната Kontur.Talk создана!');
           return;
         }
-        console.warn('[Kontur] Неожиданный ответ от вебхука:', webhookData);
+        logger.warn('Неожиданный ответ от вебхука:', webhookData);
         alert('✅ Запрос отправлен.');
         return;
       }
@@ -211,7 +193,7 @@ class KonturMeetingPlugin {
         message: `Я создал встречу: ${roomUrl}`
       };
 
-      console.log('[Kontur] Создание сообщения в канале', postPayload);
+      logger.log('Создание сообщения в канале', postPayload);
 
       const postResponse = await fetch('/api/v4/posts', {
         method: 'POST',
@@ -228,181 +210,191 @@ class KonturMeetingPlugin {
       }
 
       const postData = await postResponse.json();
-      console.log('[Kontur] Сообщение опубликовано успешно', postData);
+      logger.log('Сообщение опубликовано успешно', postData);
 
       // Open meeting room in new tab (default: true)
       const openInNewTab = this.config && this.config.OpenInNewTab !== false;
       if (openInNewTab) {
-        console.log('[Kontur] Открытие встречи в новой вкладке');
+        logger.log('Открытие встречи в новой вкладке');
         window.open(roomUrl, '_blank');
       }
 
     } catch (error) {
-      console.error('[Kontur] Ошибка при создании быстрого созвона:', {
+      logger.error('Ошибка при создании быстрого созвона:', {
         message: error.message,
         stack: error.stack
       });
       
-      // Show user-friendly error messages
-      let errorMessage = '❌ Не удалось создать встречу.\n\n';
-      
-      if (error.message.includes('Failed to fetch') || error.message.includes('ERR_CONNECTION_REFUSED')) {
-        errorMessage += '🔌 Не удалось подключиться к вебхуку:\n';
-        errorMessage += (this.config && this.config.WebhookURL) || 'URL не настроен';
-        errorMessage += '\n\nПроверьте:\n';
-        errorMessage += '1. n8n запущен и доступен\n';
-        errorMessage += '2. Workflow активирован\n';
-        errorMessage += '3. URL указан правильно';
-      } else if (error.message.includes('Вебхук вернул ошибку')) {
-        errorMessage += '⚠️ Вебхук вернул ошибку. Проверьте логи workflow в n8n.';
-      } else if (error.message.includes('Отсутствует поле room_url')) {
-        errorMessage += '⚠️ Некорректный ответ от вебхука. Отсутствует поле room_url.';
-      } else if (error.message.includes('Не удалось опубликовать сообщение')) {
-        errorMessage += '⚠️ Не удалось опубликовать сообщение в канале. Проверьте права доступа.';
-      } else {
-        errorMessage += error.message;
-      }
-      
+      // Use common error formatter from helpers
+      const errorMessage = formatErrorMessage(error, this.config);
       alert(errorMessage);
     }
   }
 
 
   /**
-   * Show meeting dropdown menu
+   * Open dropdown menu (React-based approach)
    * @param {Object} channel - Current channel object
+   * @param {Object} channelMember - Channel member object
    */
-  showMeetingDropdown(channel) {
-    // Закрыть предыдущий dropdown если открыт
-    if (this.currentDropdown) {
-      this.currentDropdown.remove();
-      this.currentDropdown = null;
-    }
-
-    // Найти channel header для позиционирования
-    const header = document.querySelector('.channel-header__links') || 
-                   document.querySelector('.channel-header');
-    
-    if (!header) {
-      console.error('[Kontur] Channel header not found');
-      return;
-    }
-
-    // Получить позицию header
-    const rect = header.getBoundingClientRect();
-
-    // Создать dropdown элемент
-    const dropdown = document.createElement('div');
-    dropdown.className = 'kontur-meeting-dropdown';
-    dropdown.style.cssText = `
-      position: fixed;
-      background: var(--center-channel-bg, #fff);
-      border: 1px solid var(--center-channel-color-16, rgba(0,0,0,0.1));
-      border-radius: 4px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      z-index: 10000;
-      min-width: 200px;
-      padding: 4px 0;
-    `;
-    
-    // Добавить в DOM
-    document.body.appendChild(dropdown);
-    
-    // Позиционировать относительно channel header
-    dropdown.style.top = `${rect.bottom + 4}px`;
-    dropdown.style.right = '16px';
-
-    // Создать кнопку "Созвониться сейчас"
-    const instantBtn = document.createElement('button');
-    instantBtn.textContent = '📹 Созвониться сейчас';
-    instantBtn.style.cssText = `
-      width: 100%;
-      padding: 8px 16px;
-      text-align: left;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      color: var(--center-channel-color, #333);
-      font-size: 14px;
-    `;
-    instantBtn.onmouseenter = () => {
-      instantBtn.style.background = 'var(--center-channel-color-08, rgba(0,0,0,0.05))';
-    };
-    instantBtn.onmouseleave = () => {
-      instantBtn.style.background = 'transparent';
-    };
-    instantBtn.onclick = () => {
-      this.handleInstantCall(channel);
-      this.closeDropdown();
-    };
-    dropdown.appendChild(instantBtn);
-
-    // Создать разделитель
-    const divider = document.createElement('div');
-    divider.style.cssText = `
-      height: 1px;
-      background: var(--center-channel-color-16, rgba(0,0,0,0.1));
-      margin: 4px 0;
-    `;
-    dropdown.appendChild(divider);
-
-    // Создать кнопку "Запланировать встречу"
-    const scheduleBtn = document.createElement('button');
-    scheduleBtn.textContent = '📅 Запланировать встречу';
-    scheduleBtn.style.cssText = `
-      width: 100%;
-      padding: 8px 16px;
-      text-align: left;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      color: var(--center-channel-color, #333);
-      font-size: 14px;
-    `;
-    scheduleBtn.onmouseenter = () => {
-      scheduleBtn.style.background = 'var(--center-channel-color-08, rgba(0,0,0,0.05))';
-    };
-    scheduleBtn.onmouseleave = () => {
-      scheduleBtn.style.background = 'transparent';
-    };
-    scheduleBtn.onclick = () => {
-      this.handleScheduleMeeting(channel);
-      this.closeDropdown();
-    };
-    dropdown.appendChild(scheduleBtn);
-
-    // Dropdown уже добавлен в DOM выше для измерения размера
-    this.currentDropdown = dropdown;
-
-    // Закрытие при клике вне dropdown
-    const closeDropdown = (e) => {
-      if (this.currentDropdown && !this.currentDropdown.contains(e.target)) {
-        // Проверить, что клик не по кнопке плагина
-        const button = document.querySelector('[data-plugin-id="kontur-meeting-button"]');
-        if (!button || !button.contains(e.target)) {
-          this.closeDropdown();
-        }
-      }
-    };
-    
-    // Использовать setTimeout чтобы не сработал сразу клик по кнопке
-    setTimeout(() => {
-      document.addEventListener('mousedown', closeDropdown);
-      this.dropdownCloseHandler = closeDropdown;
-    }, 0);
+  openDropdown(channel, channelMember) {
+    logger.log('Opening dropdown menu for channel:', channel.id);
+    this.dropdownChannel = channel;
+    this.isDropdownOpen = true;
+    this.renderDropdown();
   }
 
   /**
    * Close dropdown menu
    */
   closeDropdown() {
-    if (this.currentDropdown) {
-      this.currentDropdown.remove();
-      this.currentDropdown = null;
+    logger.log('Closing dropdown menu');
+    this.isDropdownOpen = false;
+    this.dropdownChannel = null;
+    this.renderDropdown();
+  }
+
+  /**
+   * Render dropdown based on isDropdownOpen state
+   */
+  renderDropdown() {
+    const React = window.React;
+    const ReactDOM = window.ReactDOM;
+
+    if (!React || !ReactDOM) {
+      logger.error('React не доступен для dropdown');
+      return;
     }
-    if (this.dropdownCloseHandler) {
-      document.removeEventListener('mousedown', this.dropdownCloseHandler);
-      this.dropdownCloseHandler = null;
+
+    // Create dropdown container if it doesn't exist
+    if (!this.dropdownContainer) {
+      this.dropdownContainer = document.createElement('div');
+      this.dropdownContainer.id = 'kontur-meeting-dropdown-container';
+      document.body.appendChild(this.dropdownContainer);
+    }
+
+    // Render or unmount dropdown based on state
+    if (this.isDropdownOpen && this.dropdownChannel) {
+      // Use KonturMeetingDropdown component but pass isOpen prop
+      // We need to create a wrapper that simulates the button click
+      const DropdownMenu = () => {
+        const [isOpen, setIsOpen] = React.useState(true);
+        const dropdownRef = React.useRef(null);
+
+        React.useEffect(() => {
+          const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+              // Check if click is not on the plugin button
+              const button = document.querySelector('[data-plugin-id="kontur-meeting-button"]');
+              if (!button || !button.contains(event.target)) {
+                this.closeDropdown();
+              }
+            }
+          };
+
+          document.addEventListener('mousedown', handleClickOutside);
+          return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+          };
+        }, []);
+
+        const handleInstantCall = () => {
+          this.handleInstantCall(this.dropdownChannel);
+          this.closeDropdown();
+        };
+
+        const handleScheduleMeeting = () => {
+          this.handleScheduleMeeting(this.dropdownChannel);
+          this.closeDropdown();
+        };
+
+        // Find channel header position
+        const header = document.querySelector('.channel-header__links') || 
+                       document.querySelector('.channel-header');
+        const rect = header ? header.getBoundingClientRect() : { bottom: 60, right: 16 };
+
+        return React.createElement(
+          'div',
+          {
+            ref: dropdownRef,
+            style: {
+              position: 'fixed',
+              top: `${rect.bottom + 4}px`,
+              right: '16px',
+              background: 'var(--center-channel-bg, #fff)',
+              border: '1px solid var(--center-channel-color-16, rgba(0,0,0,0.1))',
+              borderRadius: '4px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              zIndex: 10000,
+              minWidth: '200px',
+              padding: '4px 0'
+            }
+          },
+          [
+            // Instant call button
+            React.createElement(
+              'button',
+              {
+                key: 'instant',
+                onClick: handleInstantCall,
+                onMouseEnter: (e) => e.target.style.background = 'var(--center-channel-color-08, rgba(0,0,0,0.05))',
+                onMouseLeave: (e) => e.target.style.background = 'transparent',
+                style: {
+                  width: '100%',
+                  padding: '8px 16px',
+                  textAlign: 'left',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--center-channel-color, #333)',
+                  fontSize: '14px'
+                }
+              },
+              '📹 Созвониться сейчас'
+            ),
+            // Divider
+            React.createElement('div', {
+              key: 'divider',
+              style: {
+                height: '1px',
+                background: 'var(--center-channel-color-16, rgba(0,0,0,0.1))',
+                margin: '4px 0'
+              }
+            }),
+            // Schedule meeting button
+            React.createElement(
+              'button',
+              {
+                key: 'schedule',
+                onClick: handleScheduleMeeting,
+                onMouseEnter: (e) => e.target.style.background = 'var(--center-channel-color-08, rgba(0,0,0,0.05))',
+                onMouseLeave: (e) => e.target.style.background = 'transparent',
+                style: {
+                  width: '100%',
+                  padding: '8px 16px',
+                  textAlign: 'left',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--center-channel-color, #333)',
+                  fontSize: '14px'
+                }
+              },
+              '📅 Запланировать встречу'
+            )
+          ]
+        );
+      };
+
+      ReactDOM.render(
+        React.createElement(DropdownMenu),
+        this.dropdownContainer
+      );
+    } else {
+      // Unmount dropdown
+      if (this.dropdownContainer && this.dropdownContainer.hasChildNodes()) {
+        ReactDOM.unmountComponentAtNode(this.dropdownContainer);
+      }
     }
   }
 
@@ -411,7 +403,7 @@ class KonturMeetingPlugin {
    * @param {Object} channel - Current channel object
    */
   openScheduleModal(channel) {
-    console.log('[Kontur] Открытие модального окна планирования встречи:', {
+    logger.log('Открытие модального окна планирования встречи:', {
       channel: channel.display_name || channel.name,
       channelId: channel.id,
       channelType: channel.type
@@ -445,7 +437,7 @@ class KonturMeetingPlugin {
     const ReactDOM = window.ReactDOM;
 
     if (!React || !ReactDOM) {
-      console.error('[Kontur] React не доступен. Проверьте версию Mattermost.');
+      logger.error('React не доступен. Проверьте версию Mattermost.');
       return;
     }
 
@@ -463,11 +455,11 @@ class KonturMeetingPlugin {
         React.createElement(ScheduleMeetingModal, {
           channel: this.currentChannel,
           onClose: () => {
-            console.log('[Kontur] Модальное окно закрыто - вызов closeScheduleModal');
+            logger.log('Модальное окно закрыто - вызов closeScheduleModal');
             this.closeScheduleModal();
           },
           onSuccess: () => {
-            console.log('[Kontur] Meeting scheduled successfully - вызов closeScheduleModal');
+            logger.log('Meeting scheduled successfully - вызов closeScheduleModal');
             this.closeScheduleModal();
           }
         }),
@@ -485,7 +477,7 @@ class KonturMeetingPlugin {
             this.modalContainer.innerHTML = '';
           }
         } catch (error) {
-          console.error('[Kontur] Ошибка при размонтировании модалки:', error);
+          logger.error('Ошибка при размонтировании модалки:', error);
           // Принудительно очистить контейнер
           if (this.modalContainer) {
             this.modalContainer.innerHTML = '';
