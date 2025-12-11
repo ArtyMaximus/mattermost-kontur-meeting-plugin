@@ -1,0 +1,56 @@
+# Compiled binaries
+server/dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+*.tar.gz
+*.zip
+
+# Webapp build output
+webapp/dist/
+
+# Node modules
+node_modules/
+webapp/node_modules/
+
+# Go
+*.test
+*.out
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+build_temp/
+
+# Coverage
+coverage/
+*.coverprofile
+

@@ -1,0 +1,43 @@
+{
+  "id": "com.skyeng.kontur-meeting",
+  "name": "Kontur.Talk Meeting",
+  "description": "Создание встреч Kontur.Talk из каналов Mattermost через интеграцию с n8n",
+  "homepage_url": "https://github.com/skyeng/mattermost-kontur-meeting-plugin",
+  "support_url": "https://github.com/skyeng/mattermost-kontur-meeting-plugin/issues",
+  "version": "1.0.0",
+  "min_server_version": "7.8.0",
+  "icon_path": "assets/icon.svg",
+  "server": {
+    "executables": {
+      "linux-amd64": "server/dist/plugin-linux-amd64",
+      "darwin-amd64": "server/dist/plugin-darwin-amd64",
+      "darwin-arm64": "server/dist/plugin-darwin-arm64",
+      "windows-amd64": "server/dist/plugin-windows-amd64.exe"
+    }
+  },
+  "webapp": {
+    "bundle_path": "webapp/dist/main.js"
+  },
+  "settings_schema": {
+    "header": "## Настройки интеграции с Kontur.Talk\n\nУкажите URL вебхука n8n для создания встреч Kontur.Talk",
+    "footer": "После настройки перезагрузите Mattermost (Ctrl+R), чтобы увидеть кнопку создания встречи в заголовке канала.",
+    "settings": [
+      {
+        "key": "WebhookURL",
+        "display_name": "URL вебхука n8n",
+        "type": "text",
+        "help_text": "Полный URL вашего n8n webhook (например, `https://n8n.skyeng.tech/webhook/60ca5991-...`)",
+        "placeholder": "https://n8n.skyeng.tech/webhook/...",
+        "default": ""
+      },
+      {
+        "key": "OpenInNewTab",
+        "display_name": "Открывать встречу в новой вкладке",
+        "type": "bool",
+        "help_text": "Если включено, ссылка на встречу автоматически откроется в новой вкладке браузера",
+        "default": true
+      }
+    ]
+  }
+}
+

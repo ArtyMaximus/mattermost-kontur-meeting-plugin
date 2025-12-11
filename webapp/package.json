@@ -1,0 +1,16 @@
+{
+  "name": "kontur-meeting-plugin",
+  "version": "1.0.0",
+  "description": "Kontur.Talk Meeting plugin for Mattermost",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "webpack --mode=production"
+  },
+  "devDependencies": {
+    "webpack": "^5.88.0",
+    "webpack-cli": "^5.1.4"
+  }
+}
+
+
+

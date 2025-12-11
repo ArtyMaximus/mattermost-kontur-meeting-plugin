@@ -1,0 +1,78 @@
+{
+  "name": "Kontur.Talk Meeting Creator (Mock)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kontur-create",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "kontur-create"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract data from webhook\nconst channelId = $input.item.json.channel_id;\nconst channelName = $input.item.json.channel_name;\nconst channelType = $input.item.json.channel_type;\nconst userId = $input.item.json.user_id;\nconst username = $input.item.json.username;\n\n// Log incoming request\nconsole.log('Creating meeting for:', {\n  channel: channelName,\n  user: username,\n  type: channelType\n});\n\n// Generate mock room URL\n// В реальной интеграции здесь будет вызов API Kontur.Talk\nconst roomId = `${channelId.substring(0, 8)}-${Date.now()}`;\nconst roomUrl = `https://meet.google.com/mock-${channelId.substring(0, 8)}`;\n\n// Для реальной интеграции раскомментируйте:\n// const roomUrl = `https://space.ktalk.ru/room/${roomId}`;\n\nreturn {\n  json: {\n    room_url: roomUrl,\n    room_id: roomId,\n    room_name: `Meeting - ${channelName}`,\n    channel_id: channelId,\n    channel_name: channelName,\n    created_by: username,\n    created_by_id: userId,\n    created_at: new Date().toISOString(),\n    status: \"success\"\n  }\n};"
+      },
+      "id": "function-create-room",
+      "name": "Create Meeting Room",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [690, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Create Meeting Room",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Meeting Room": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}
+
+
+
