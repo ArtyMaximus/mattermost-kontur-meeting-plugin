@@ -54,3 +54,6 @@ build_temp/
 coverage/
 *.coverprofile
 
+# Mattermost configuration (contains sensitive info)
+mattermost-config.json
+

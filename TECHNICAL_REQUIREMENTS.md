@@ -15,9 +15,10 @@
 
 ### 1.2 Пользовательский сценарий
 1. Пользователь нажимает кнопку в header канала
-2. Появляется dropdown с выбором: "Созвониться сейчас" или "Запланировать встречу"
-3. При выборе "Созвониться сейчас" — создается мгновенная встреча (как сейчас)
-4. При выборе "Запланировать встречу" — открывается диалог для планирования
+2. Открывается кастомное React-модальное окно для планирования встречи
+3. Пользователь заполняет форму (дата/время, длительность, название, участники)
+4. При отправке формы — данные отправляются на серверный endpoint плагина
+5. Серверный endpoint обрабатывает данные, отправляет запрос в n8n и создает сообщение в канале
 
 ---
 
@@ -45,46 +46,20 @@ plugin/
 
 ## 3. UI/UX требования
 
-### 3.1 Dropdown меню при клике на кнопку
+### 3.1 Кнопка в channel header
 
 **Текущее состояние:**
 - Кнопка в channel header с иконкой видеокамеры
-- При клике сразу создается instant_call
-
-**Новое поведение:**
-- При клике на кнопку показывается dropdown меню с двумя опциями:
-  1. "Созвониться сейчас" (instant_call)
-  2. "Запланировать встречу" (scheduled_meeting)
+- При клике открывается кастомное React-модальное окно для планирования встречи
 
 **Реализация:** 
-Использовать `registry.registerChannelHeaderComponent()` вместо `registerChannelHeaderButtonAction()`.
+Использовать `registry.registerChannelHeaderButtonAction()` для регистрации кнопки.
 
 **Технические детали:**
-1. Создать React компонент `webapp/src/components/kontur_meeting_dropdown.jsx`
-2. Компонент рендерит кнопку с SVG иконкой
-3. При клике показывается dropdown меню (React state)
-4. Dropdown закрывается при клике вне (useEffect + addEventListener)
-5. Использовать Mattermost CSS переменные для стилизации
-
-**Код регистрации в webapp/src/index.js:**
-```javascript
-import KonturMeetingDropdown from './components/kontur_meeting_dropdown';
-
-class KonturMeetingPlugin {
-    initialize(registry, store) {
-        this.registry = registry;
-        this.store = store;
-        
-        // ИСПОЛЬЗОВАТЬ registerChannelHeaderComponent, НЕ registerChannelHeaderButtonAction
-        registry.registerChannelHeaderComponent(KonturMeetingDropdown);
-    }
-}
-```
-
-**Компонент получает автоматически:**
-- `channel` - объект канала
-- `channelMember` - участник канала (текущий пользователь)
-- `theme` - тема оформления
+1. Кнопка регистрируется в `webapp/src/index.js` через `registerChannelHeaderButtonAction`
+2. При клике вызывается `handleScheduleMeeting(channel)`, который открывает React-модалку
+3. Модалка рендерится через `ReactDOM.render` в отдельный контейнер
+4. Использовать Mattermost CSS переменные для стилизации
 
 **CSS переменные Mattermost:**
 - `var(--center-channel-bg)` - фон
@@ -92,36 +67,37 @@ class KonturMeetingPlugin {
 - `var(--center-channel-color-08)` - hover фон
 - `var(--center-channel-color-16)` - borders
 - `var(--center-channel-color-64)` - вторичный текст
+- `var(--button-bg)` - фон кнопки
+- `var(--button-color)` - цвет текста кнопки
 
-**Требования к dropdown:**
-- Отображается при клике на кнопку
-- Закрывается при выборе опции или клике вне меню
-- Иконки для каждой опции (опционально)
-- Подсказки при наведении
-- Работает в light и dark темах
+### 3.2 Кастомное React-модальное окно для планирования
 
-### 3.2 Interactive Dialog для планирования
+**Триггер:** Клик по кнопке в channel header
 
-**Триггер:** Выбор "Запланировать встречу" в dropdown
-
-**Поля диалога:**
+**Поля модального окна:**
 
 | Поле | Тип | Обязательность | Описание |
 |------|-----|----------------|----------|
-| Дата и время встречи | datetime | ✅ Обязательно | Выбор даты, времени и timezone |
+| Дата и время встречи | datetime-local | ✅ Обязательно | HTML5 input типа datetime-local для выбора даты и времени |
 | Продолжительность | select | ✅ Обязательно | Длительность встречи. Опции: "15 минут" (value: "15"), "30 минут" (value: "30"), "45 минут" (value: "45"), "1 час" (value: "60"), "1.5 часа" (value: "90"), "2 часа" (value: "120"), "3 часа" (value: "180"), "4 часа" (value: "240"). В API отправляется value в минутах. |
-| Название встречи | text | ❌ Опционально | Название встречи |
-| Участники | select с data_source: "users" | Зависит от типа канала | Multi-select с автодополнением |
+| Название встречи | text | ❌ Опционально | Текстовое поле для названия встречи (максимум 100 символов) |
+| Участники | search + multi-select | ✅ Обязательно | Поиск пользователей через Mattermost API (`/api/v4/users/search`) с отображением результатов и возможностью выбора нескольких участников |
 
 **Валидация полей:**
 - Дата и время: обязательны, не может быть в прошлом, максимум +30 дней
 - Продолжительность: обязательно, минимум 5 минут, максимум 480 минут (8 часов)
 - Название: опционально, максимум 100 символов
-- Участники: зависит от типа канала (см. раздел 4)
+- Участники: обязательно, минимум 1 участник
 
-**Кнопки диалога:**
-- "Создать встречу" (submit)
-- "Отмена" (cancel)
+**Поведение модального окна:**
+- Открывается при клике на header-кнопку
+- Закрывается по кнопке "Отмена", по клавише Esc или при клике вне модалки
+- При отправке формы данные валидируются на клиенте, затем отправляются POST-запросом на `/plugins/com.skyeng.kontur-meeting/api/schedule-meeting`
+- При успехе модалка закрывается, при ошибке показывается сообщение об ошибке
+
+**Кнопки модального окна:**
+- "Создать встречу" (submit) - отправляет форму
+- "Отмена" (cancel) - закрывает модалку без сохранения
 
 ---
 
@@ -209,145 +185,42 @@ module.exports = {
 };
 ```
 
-### 5.2 Новый компонент: kontur_meeting_dropdown.jsx
+### 5.2 Новый компонент: schedule_meeting_modal.jsx
 
-**Описание:** React компонент для dropdown меню в channel header
+**Описание:** React компонент для модального окна планирования встречи
 
-**Файл:** `webapp/src/components/kontur_meeting_dropdown.jsx`
+**Файл:** `webapp/src/components/schedule_meeting_modal.jsx`
 
 **Структура:**
-```jsx
-import React, {useState, useEffect, useRef} from 'react';
-import PropTypes from 'prop-types';
+- React-компонент с использованием хуков (useState, useEffect, useRef)
+- Форма с полями: дата/время, длительность, название, участники
+- Поиск участников через Mattermost API
+- Валидация на клиенте перед отправкой
+- Отправка данных на серверный endpoint `/api/schedule-meeting`
+- Обработка ошибок и отображение сообщений пользователю
 
-const KonturMeetingDropdown = ({channel, channelMember, theme}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-  
-  // Закрытие при клике вне
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-    
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen]);
-  
-  const handleInstantCall = () => {
-    setIsOpen(false);
-    // Вызвать handleInstantCall из плагина
-    window.KonturMeetingPlugin?.handleInstantCall(channel);
-  };
-  
-  const handleScheduleMeeting = () => {
-    setIsOpen(false);
-    // Вызвать handleScheduleMeeting из плагина
-    window.KonturMeetingPlugin?.handleScheduleMeeting(channel);
-  };
-  
-  return (
-    <div ref={dropdownRef} style={{position: 'relative', display: 'inline-block'}}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          padding: '4px 8px',
-          color: 'var(--center-channel-color)'
-        }}
-      >
-        {/* SVG иконка видеокамеры */}
-      </button>
-      
-      {isOpen && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            right: 0,
-            marginTop: '4px',
-            background: 'var(--center-channel-bg)',
-            border: '1px solid var(--center-channel-color-16)',
-            borderRadius: '4px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            zIndex: 1000,
-            minWidth: '200px'
-          }}
-        >
-          <button
-            onClick={handleInstantCall}
-            style={{
-              width: '100%',
-              padding: '8px 16px',
-              textAlign: 'left',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--center-channel-color)'
-            }}
-            onMouseEnter={(e) => e.target.style.background = 'var(--center-channel-color-08)'}
-            onMouseLeave={(e) => e.target.style.background = 'transparent'}
-          >
-            📹 Созвониться сейчас
-          </button>
-          <button
-            onClick={handleScheduleMeeting}
-            style={{
-              width: '100%',
-              padding: '8px 16px',
-              textAlign: 'left',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--center-channel-color)',
-              borderTop: '1px solid var(--center-channel-color-16)'
-            }}
-            onMouseEnter={(e) => e.target.style.background = 'var(--center-channel-color-08)'}
-            onMouseLeave={(e) => e.target.style.background = 'transparent'}
-          >
-            📅 Запланировать встречу
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
+**Основные функции компонента:**
+- `handleSubmit` - обработка отправки формы
+- `validate` - валидация полей формы
+- `addParticipant` / `removeParticipant` - управление списком участников
+- Поиск пользователей через debounced API-запросы
 
-KonturMeetingDropdown.propTypes = {
-  channel: PropTypes.object.isRequired,
-  channelMember: PropTypes.object,
-  theme: PropTypes.object
-};
-
-export default KonturMeetingDropdown;
-```
+**Пропсы:**
+- `channel` - объект канала (обязательно)
+- `onClose` - функция закрытия модалки (обязательно)
+- `onSuccess` - функция успешного создания встречи (опционально)
 
 ### 5.3 Модификация index.js
 
-**Текущая функция:** `handleCreateMeeting(channel)` - удалить
-
-**Новые функции:**
-- `handleInstantCall(channel)` - создает мгновенную встречу
-- `handleScheduleMeeting(channel)` - открывает Interactive Dialog
-
-**Регистрация компонента:**
+**Регистрация кнопки:**
 ```javascript
-import KonturMeetingDropdown from './components/kontur_meeting_dropdown';
-
 class KonturMeetingPlugin {
   constructor() {
     this.config = null;
     // Экспортировать методы для доступа из компонента
     window.KonturMeetingPlugin = this;
+    this.modalContainer = null;
+    this.currentModal = null;
   }
 
   async initialize(registry, store) {
@@ -357,8 +230,15 @@ class KonturMeetingPlugin {
     // Загрузить конфигурацию
     await this.loadConfig();
     
-    // Регистрировать компонент вместо кнопки
-    registry.registerChannelHeaderComponent(KonturMeetingDropdown);
+    // Регистрировать кнопку в channel header
+    registry.registerChannelHeaderButtonAction(
+      icon,
+      (channel, channelMember) => {
+        this.handleScheduleMeeting(channel);
+      },
+      'Запланировать встречу Kontur.Talk',
+      'kontur-meeting-button'
+    );
     
     console.log('[Kontur] Плагин инициализирован успешно');
   }
@@ -383,18 +263,18 @@ class KonturMeetingPlugin {
 
 ### 5.5 Новая функция: handleScheduleMeeting
 
-**Описание:** Открывает Interactive Dialog для планирования встречи
+**Описание:** Открывает кастомное React-модальное окно для планирования встречи
 
 **Параметры:**
 - `channel` — объект канала
 
 **Логика:**
-1. Определить тип канала
-2. Для DM канала:
-   - Получить второго участника через `getDMOtherUser()`
-   - Сформировать подсказку для поля участников
-3. Сформировать структуру Interactive Dialog
-4. Открыть диалог через `openInteractiveDialog()`
+1. Проверить наличие конфигурации webhook URL
+2. Закрыть предыдущее модальное окно, если открыто
+3. Создать контейнер для модального окна в DOM
+4. Динамически импортировать компонент `ScheduleMeetingModal`
+5. Отрендерить модальное окно через `ReactDOM.render`
+6. Передать пропсы: `channel`, `onClose`, `onSuccess`
 
 ### 5.6 Новая функция: getDMOtherUser
 
@@ -490,9 +370,9 @@ getParticipantsHelpText(channelType, otherUser) {
 }
 ```
 
-### 5.8 Новая функция: validateScheduleDialog
+### 5.8 Валидация формы в модальном окне
 
-**Описание:** Валидирует данные Interactive Dialog перед отправкой
+**Описание:** Валидация полей формы выполняется на клиенте перед отправкой
 
 **Параметры:**
 - `submission` — объект с данными формы
@@ -618,197 +498,114 @@ parseParticipants(participants, state) {
 
 ### 5.10 Новая функция: handleScheduleDialogSubmit
 
-**Описание:** Обрабатывает submit Interactive Dialog
+**Описание:** Обработка отправки формы в модальном окне
 
-**Параметры:**
-- `submission` — объект с данными формы
-- `channel` — объект канала
+**Логика (в компоненте ScheduleMeetingModal):**
+1. Валидировать данные на клиенте через функцию `validate()`
+2. Если есть ошибки → показать их в форме, не отправлять запрос
+3. Получить `user_id` и `team_id` из Redux store через `window.KonturMeetingPlugin.store`
+4. Преобразовать дату в ISO 8601 строку
+5. Отправить POST запрос на `/plugins/com.skyeng.kontur-meeting/api/schedule-meeting`
+6. При успехе закрыть модалку, при ошибке показать сообщение
 
-**Логика:**
-1. Валидировать данные через `validateScheduleDialog()`
-2. Если есть ошибки → вернуть ошибки (диалог покажет их)
-3. Парсить участников через `parseParticipants()`
-4. Парсить datetime из Unix timestamp (секунды) и вычислить end_time
-5. Подготовить payload для webhook
-6. Отправить POST запрос на webhook URL
-7. Обработать ответ и создать сообщение в канале
-8. Закрыть диалог
-
-**Обработка datetime и продолжительности:**
+**Обработка datetime:**
 ```javascript
-// submission.meeting_datetime - Unix timestamp в СЕКУНДАХ (integer)
-const scheduledAt = new Date(submission.meeting_datetime * 1000); // Умножить на 1000!
+// meetingDatetime - значение из input[type="datetime-local"]
+const startAt = new Date(meetingDatetime).toISOString(); // ISO 8601 строка
 
-// submission.duration - value из опций (строка с минутами: "15", "30", "45", "60", "90", "120", "180", "240")
-const durationMinutes = parseInt(submission.duration, 10);
-
-// Вычислить время окончания
-const endTime = new Date(scheduledAt.getTime() + durationMinutes * 60 * 1000);
-
-// Форматировать для n8n
-const scheduledAtISO = scheduledAt.toISOString();
-const endTimeISO = endTime.toISOString();
+// duration - значение из select (строка: "15", "30", "45", "60", "90", "120", "180", "240")
+const durationMinutes = parseInt(duration, 10);
 ```
 
 **Обработка участников:**
 ```javascript
-// Универсальная обработка (может быть строка или массив)
-let participantIds = submission.participants || [];
-
-if (typeof participantIds === 'string') {
-  participantIds = participantIds.split(',').map(id => id.trim());
-}
-
-if (!Array.isArray(participantIds)) {
-  participantIds = [];
-}
-
-// Получить информацию о пользователях из Redux store
-const state = this.store.getState();
-const participants = participantIds.map(userId => {
-  const user = state.entities.users.profiles[userId];
-  if (!user) {
-    return null;
-  }
-  return {
-    user_id: user.id,
-    username: user.username,
-    email: user.email || null,
-    first_name: user.first_name || null,
-    last_name: user.last_name || null
-  };
-}).filter(Boolean);
+// participants - массив объектов {id, username, email, first_name, last_name}
+const participantIds = participants.map(p => p.id);
 ```
 
-**Создание сообщения в канале после успешного создания:**
+**Формат запроса:**
 ```javascript
-// После успешного ответа от n8n
-const postMessage = `📅 @${currentUser.username} запланировал встречу на ${formatDateTime(scheduledAt)}\n\n` +
-                   `Участники: ${participants.map(p => '@' + p.username).join(', ')}\n\n` +
-                   `Продолжительность: ${durationMinutes} минут\n\n` +
-                   `[Присоединиться к встрече](${data.room_url})`;
+const requestBody = {
+  channel_id: channel.id,
+  team_id: userInfo.team_id,
+  user_id: userInfo.user_id,
+  start_at: startAt,
+  duration_minutes: durationMinutes,
+  title: meetingTitle.trim() || null,
+  participant_ids: participantIds
+};
 
-await fetch('/api/v4/posts', {
+const response = await fetch('/plugins/com.skyeng.kontur-meeting/api/schedule-meeting', {
   method: 'POST',
   credentials: 'same-origin',
   headers: {
     'Content-Type': 'application/json',
     'X-Requested-With': 'XMLHttpRequest'
   },
-  body: JSON.stringify({
-    channel_id: channel.id,
-    message: postMessage
-  })
+  body: JSON.stringify(requestBody)
 });
 ```
 
-### 5.11 Структура Interactive Dialog
+### 5.11 Архитектура модального окна
 
-**Формат:**
+**Поток данных:**
+1. Пользователь кликает на header-кнопку → вызывается `handleScheduleMeeting(channel)`
+2. Создается контейнер в DOM и рендерится React-компонент `ScheduleMeetingModal`
+3. Пользователь заполняет форму в модальном окне
+4. При submit данные валидируются на клиенте
+5. Валидные данные отправляются POST-запросом на `/plugins/com.skyeng.kontur-meeting/api/schedule-meeting`
+6. Серверный endpoint обрабатывает запрос, отправляет данные в n8n и создает сообщение в канале
+7. При успехе модалка закрывается, при ошибке показывается сообщение
+
+**Формат данных для отправки:**
 ```javascript
 {
-  url: '/plugins/com.skyeng.kontur-meeting/schedule-submit',
-  dialog: {
-    title: 'Запланировать встречу Kontur.Talk',
-    introduction: 'Заполните форму для создания запланированной встречи',
-    elements: [
-      {
-        display_name: 'Дата и время встречи',
-        name: 'meeting_datetime',
-        type: 'datetime',          // ✅ ПРАВИЛЬНО (НЕ text с subtype!)
-        optional: false
-      },
-      {
-        display_name: 'Продолжительность',
-        name: 'duration',
-        type: 'select',
-        placeholder: 'Выберите продолжительность',
-        help_text: 'Обязательное поле. Длительность встречи в минутах.',
-        optional: false,
-        options: [
-          // text - что видит пользователь (человекопонятно)
-          // value - что отправляется в API (минуты в виде строки)
-          {text: '15 минут', value: '15'},
-          {text: '30 минут', value: '30'},
-          {text: '45 минут', value: '45'},
-          {text: '1 час', value: '60'},
-          {text: '1.5 часа', value: '90'},
-          {text: '2 часа', value: '120'},
-          {text: '3 часа', value: '180'},
-          {text: '4 часа', value: '240'}
-        ],
-        default: '60' // По умолчанию 1 час (value в минутах)
-      },
-      {
-        display_name: 'Название встречи',
-        name: 'meeting_title',
-        type: 'text',
-        placeholder: 'Обсуждение проекта',
-        help_text: 'Опционально, максимум 100 символов',
-        optional: true,
-        default: channel.display_name || channel.name
-      },
-      {
-        display_name: 'Участники',
-        name: 'participants',
-        type: 'select',
-        data_source: 'users',
-        multiselect: true,
-        placeholder: 'Выберите участников',
-        help_text: getParticipantsHelpText(channel.type, otherUser),
-        optional: channel.type === 'D', // Для DM опционально, но рекомендуется
-        // НЕ использовать default - может не работать!
-      }
-    ],
-    submit_label: 'Создать встречу',
-    notify_on_cancel: false
-  }
+  channel_id: channel.id,
+  team_id: teamId,
+  user_id: currentUserId,
+  start_at: "2024-01-15T14:00:00Z",  // ISO 8601 строка
+  duration_minutes: 60,               // число
+  title: "Обсуждение проекта",        // строка или null
+  participant_ids: ["user1", "user2"] // массив строк
 }
 ```
-
-**ВАЖНО:** 
-- `type: 'datetime'` (НЕ `type: 'text', subtype: 'datetime'`)
-- НЕ использовать недокументированные параметры (`time_interval`, `min_date`, `max_date`)
-- НЕ использовать `default` для `participants` с `multiselect: true` - может не работать
 
 ---
 
 ## 6. Технические требования: серверная часть
 
-### 6.1 Новый endpoint: /schedule-submit
+### 6.1 Новый endpoint: /api/schedule-meeting
 
 **Метод:** POST
 
-**Описание:** Обрабатывает submit Interactive Dialog
+**Описание:** Обрабатывает запрос на создание запланированной встречи из кастомной React-модалки
 
-**Путь:** `/plugins/com.skyeng.kontur-meeting/schedule-submit`
+**Путь:** `/plugins/com.skyeng.kontur-meeting/api/schedule-meeting`
 
 **Request Body:**
 ```json
 {
   "channel_id": "abc123",
+  "team_id": "team123",
   "user_id": "user123",
-  "submission": {
-    "meeting_datetime": 1703080800,
-    "duration": "60",  // value из опций (строка с минутами: "15", "30", "45", "60", "90", "120", "180", "240")
-    "meeting_title": "Обсуждение проекта",
-    "participants": ["user456", "user789"]
-  },
-  "context": {
-    "channel_type": "D"
-  }
+  "start_at": "2024-01-15T14:00:00Z",
+  "duration_minutes": 60,
+  "title": "Обсуждение проекта",
+  "participant_ids": ["user456", "user789"]
 }
 ```
 
-**ВАЖНО:** `meeting_datetime` - это Unix timestamp в СЕКУНДАХ (integer), НЕ строка!
+**ВАЖНО:** 
+- `start_at` - ISO 8601 строка (RFC3339 формат), НЕ Unix timestamp
+- `duration_minutes` - число (integer), НЕ строка
+- `title` - строка или null (опционально)
+- `participant_ids` - массив строк с ID пользователей
 
 **Response (успех):**
 ```json
 {
-  "errors": null,
-  "data": {
-    "status": "success"
-  }
+  "status": "success",
+  "message": "Встреча успешно создана"
 }
 ```
 
@@ -817,15 +614,15 @@ await fetch('/api/v4/posts', {
 {
   "errors": [
     {
-      "field": "meeting_datetime",
+      "field": "start_at",
       "message": "Дата и время обязательны"
     },
     {
-      "field": "duration",
-      "message": "Продолжительность обязательна"
+      "field": "duration_minutes",
+      "message": "Продолжительность должна быть не менее 5 минут"
     },
     {
-      "field": "participants",
+      "field": "participant_ids",
       "message": "Выберите хотя бы одного участника"
     }
   ]
@@ -836,72 +633,45 @@ await fetch('/api/v4/posts', {
 
 **Добавить новый route:**
 ```go
-case "/schedule-submit":
-    p.handleScheduleSubmit(w, r)
+case "/api/schedule-meeting":
+    p.handleScheduleMeeting(w, r)
 ```
 
-### 6.3 Новая функция: handleScheduleSubmit
+### 6.3 Новая функция: handleScheduleMeeting
 
-**Описание:** Обрабатывает submit Interactive Dialog на сервере
+**Описание:** Обрабатывает запрос на создание запланированной встречи
 
 **Логика:**
 1. Парсить JSON из request body
 2. Валидировать обязательные поля
 3. Получить информацию о пользователях через Mattermost API по их ID
-4. Парсить datetime из Unix timestamp (секунды) и вычислить end_time
+4. Парсить datetime из ISO 8601 строки и вычислить end_time
 5. Сформировать payload для n8n
 6. Отправить запрос на n8n webhook
-7. Вернуть результат в формате Interactive Dialog response
+7. Создать сообщение в канале при успехе
+8. Вернуть результат в формате JSON
 
 **Обработка datetime:**
 ```go
-// submission.MeetingDatetime - Unix timestamp в СЕКУНДАХ (int64)
-scheduledAtUnix := int64(submission.MeetingDatetime) // int64
-scheduledAt := time.Unix(scheduledAtUnix, 0)  // ✅
-
-// Парсить продолжительность в минутах (value из опций - строка: "15", "30", "45", "60", "90", "120", "180", "240")
-durationMinutes, err := strconv.Atoi(submission.Duration)
+// req.StartAt - ISO 8601 строка (RFC3339 формат)
+scheduledAt, err := time.Parse(time.RFC3339, req.StartAt)
 if err != nil {
     // Обработка ошибки
 }
 
 // Вычислить время окончания
-endTime := scheduledAt.Add(time.Duration(durationMinutes) * time.Minute)
+endTime := scheduledAt.Add(time.Duration(req.DurationMinutes) * time.Minute)
 
 // Форматировать для n8n
 scheduledAtISO := scheduledAt.Format(time.RFC3339)
 endTimeISO := endTime.Format(time.RFC3339)
 ```
 
-**Обработка participants (универсальная):**
+**Обработка participants:**
 ```go
-// Проверить тип данных
-var participantIDs []string
-
-switch v := submission.Participants.(type) {
-case string:
-    // Если строка - split
-    participantIDs = strings.Split(v, ",")
-    for i := range participantIDs {
-        participantIDs[i] = strings.TrimSpace(participantIDs[i])
-    }
-case []string:
-    // Если уже массив
-    participantIDs = v
-case []interface{}:
-    // Если массив interface{}
-    for _, id := range v {
-        if str, ok := id.(string); ok {
-            participantIDs = append(participantIDs, str)
-        }
-    }
-default:
-    return errors.New("invalid participants format")
-}
-
-// Получить информацию о пользователях
+// req.ParticipantIDs - уже массив строк
 participants := make([]map[string]interface{}, 0)
-for _, userId := range participantIDs {
+for _, userId := range req.ParticipantIDs {
     user, err := p.API.GetUser(userId)
     if err != nil {
         p.API.LogError("Failed to get user", "user_id", userId, "error", err.Error())
@@ -1236,36 +1006,31 @@ p.API.LogWarn("Kontur: User not found", "user_id", userId)
 - [ ] Модифицировать `index.js` для использования `registerChannelHeaderComponent`
 - [ ] Реализовать `handleInstantCall` (вынести текущую логику)
 - [ ] Реализовать `handleScheduleMeeting` для открытия диалога
-- [ ] Реализовать `getDMOtherUser` через `channel.name.split('__')`
-- [ ] Реализовать `getUserById` для получения пользователя через API (если нет в store)
-- [ ] Реализовать `getParticipantsHelpText` для подсказок
-- [ ] Реализовать `parseParticipants` с универсальной обработкой (строка/массив)
-- [ ] Реализовать `validateScheduleDialog` для валидации (включая datetime и duration)
-- [ ] Реализовать `handleScheduleDialogSubmit` для обработки submit
-- [ ] Реализовать вычисление `end_time` на основе `scheduled_at` и `duration`
-- [ ] Реализовать обработку datetime из Unix timestamp (секунды × 1000)
-- [ ] Создать структуру Interactive Dialog с полем `type: 'datetime'`
-- [ ] Реализовать создание сообщения в канале после успешного создания
-- [ ] Обработать все типы ошибок от n8n
-- [ ] Протестировать dropdown в light и dark темах
+- [ ] Создать React-компонент `ScheduleMeetingModal` с формой
+- [ ] Реализовать поиск участников через Mattermost API (`/api/v4/users/search`)
+- [ ] Реализовать валидацию формы на клиенте
+- [ ] Реализовать отправку данных на `/api/schedule-meeting`
+- [ ] Реализовать обработку ошибок и отображение сообщений
+- [ ] Протестировать модальное окно в light и dark темах
+- [ ] Протестировать закрытие модалки по Esc и клику вне
 
 ### 10.2 Серверная часть
-- [ ] Добавить endpoint `/schedule-submit` в `ServeHTTP`
-- [ ] Реализовать `handleScheduleSubmit` для обработки submit
-- [ ] Реализовать валидацию на сервере (включая datetime и duration)
-- [ ] Реализовать универсальную обработку `participants` (строка/массив)
+- [ ] Добавить endpoint `/api/schedule-meeting` в `ServeHTTP`
+- [ ] Реализовать `handleScheduleMeeting` для обработки запроса
+- [ ] Реализовать валидацию на сервере (включая ISO 8601 datetime и duration_minutes)
 - [ ] Реализовать получение информации о пользователях через Mattermost API по их ID
-- [ ] Реализовать парсинг datetime из Unix timestamp (секунды) и вычисление end_time
+- [ ] Реализовать парсинг datetime из ISO 8601 строки и вычисление end_time
 - [ ] Реализовать отправку запроса на n8n webhook с полями `scheduled_at`, `end_time`, `duration_minutes`
+- [ ] Реализовать создание сообщения в канале при успехе
 - [ ] Обработать все типы ошибок
 
 ### 10.3 Тестирование
-- [ ] Протестировать формат возврата datetime (Unix timestamp в секундах)
-- [ ] Протестировать обработку datetime (умножение на 1000)
-- [ ] Протестировать DM канал с определением участника через `channel.name`
-- [ ] Протестировать групповой канал с обязательным выбором участников
-- [ ] Протестировать Group DM с обязательным выбором участников
-- [ ] Протестировать поле datetime (выбор даты, времени, timezone)
+- [ ] Протестировать формат отправки datetime (ISO 8601 строка)
+- [ ] Протестировать обработку datetime на сервере
+- [ ] Протестировать валидацию всех полей формы
+- [ ] Протестировать поиск участников
+- [ ] Протестировать создание сообщения в канале
+- [ ] Протестировать обработку ошибок от n8n
 - [ ] Протестировать поле duration (выбор продолжительности)
 - [ ] Протестировать вычисление end_time на основе scheduled_at и duration
 - [ ] Протестировать автодополнение в поле участников (поиск по username, имени, фамилии)

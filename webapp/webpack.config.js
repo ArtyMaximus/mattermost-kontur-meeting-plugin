@@ -4,7 +4,9 @@ module.exports = {
   entry: './src/index.js',
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'main.js'
+    filename: 'main.js',
+    // Отключаем автоматическое создание чанков
+    chunkFilename: undefined
   },
   externals: {
     'react': 'React',
@@ -23,11 +25,20 @@ module.exports = {
             presets: ['@babel/preset-react']
           }
         }
+      },
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader']
       }
     ]
   },
   resolve: {
     extensions: ['.js', '.jsx']
+  },
+  optimization: {
+    // Отключаем code splitting - все в один бандл
+    splitChunks: false,
+    runtimeChunk: false
   },
   mode: 'production'
 };

@@ -1,10 +1,17 @@
-import KonturMeetingDropdown from './components/kontur_meeting_dropdown';
+// Статический импорт модалки для включения в основной бандл
+import ScheduleMeetingModal from './components/schedule_meeting_modal.jsx';
 
 class KonturMeetingPlugin {
   constructor() {
     this.config = null;
     // Экспортировать методы для доступа из компонента
     window.KonturMeetingPlugin = this;
+    this.currentDropdown = null;
+    this.dropdownCloseHandler = null;
+    this.modalContainer = null;
+    this.currentModal = null;
+    this.isModalOpen = false;
+    this.currentChannel = null;
   }
 
   /**
@@ -26,8 +33,53 @@ class KonturMeetingPlugin {
       console.error('[Kontur] Ошибка загрузки конфигурации', error);
     }
 
-    // Регистрировать компонент вместо кнопки
-    registry.registerChannelHeaderComponent(KonturMeetingDropdown);
+    // Create SVG icon for channel header button
+    // React доступен глобально в Mattermost через window.React
+    let icon;
+    try {
+      if (window.React && window.React.createElement) {
+        icon = window.React.createElement(
+        'svg',
+        {
+          width: 20,
+          height: 20,
+          viewBox: '0 0 32 32',
+          xmlns: 'http://www.w3.org/2000/svg',
+          fill: 'currentColor',
+          style: { display: 'block' }
+        },
+        [
+            window.React.createElement('path', {
+            key: 'path1',
+            d: 'M0 0 C0.804375 -0.00128906 1.60875 -0.00257813 2.4375 -0.00390625 C3.283125 -0.00003906 4.12875 0.00382813 5 0.0078125 C6.2684375 0.00201172 6.2684375 0.00201172 7.5625 -0.00390625 C8.366875 -0.00261719 9.17125 -0.00132812 10 0 C10.7425 0.00112793 11.485 0.00225586 12.25 0.00341797 C14 0.1328125 14 0.1328125 15 1.1328125 C15.09909302 3.46441305 15.12970504 5.79911192 15.125 8.1328125 C15.12886719 10.0509375 15.12886719 10.0509375 15.1328125 12.0078125 C15 15.1328125 15 15.1328125 14 16.1328125 C12.66956375 16.2311846 11.33406656 16.26359842 10 16.265625 C9.195625 16.26691406 8.39125 16.26820312 7.5625 16.26953125 C6.716875 16.26566406 5.87125 16.26179688 5 16.2578125 C4.154375 16.26167969 3.30875 16.26554687 2.4375 16.26953125 C1.633125 16.26824219 0.82875 16.26695313 0 16.265625 C-0.7425 16.26449707 -1.485 16.26336914 -2.25 16.26220703 C-4 16.1328125 -4 16.1328125 -5 15.1328125 C-5.09909302 12.80121195 -5.12970504 10.46651308 -5.125 8.1328125 C-5.12757813 6.8540625 -5.13015625 5.5753125 -5.1328125 4.2578125 C-4.94045167 -0.26832466 -4.12700187 0.00626932 0 0 Z',
+            fill: 'currentColor',
+            transform: 'translate(5,7.8671875)'
+          }),
+            window.React.createElement('path', {
+            key: 'path2',
+            d: 'M0 0 C0 4.62 0 9.24 0 14 C-6.625 13.25 -6.625 13.25 -10 11 C-10.64282362 5.93776401 -10.64282362 5.93776401 -10 3 C-6.51174019 -0.18926611 -4.86864834 0 0 0 Z',
+            fill: 'currentColor',
+            transform: 'translate(32,9)'
+          })
+        ]
+      );
+      } else {
+        throw new Error('React not available');
+      }
+    } catch (error) {
+      console.warn('[Kontur] SVG icon failed, using Font Awesome fallback:', error);
+      icon = 'fa fa-video-camera';
+    }
+
+    // Register channel header button - opens dropdown menu
+    registry.registerChannelHeaderButtonAction(
+      icon,
+      (channel, channelMember) => {
+        this.showMeetingDropdown(channel);
+      },
+      'Создать встречу Kontur.Talk',
+      'kontur-meeting-button'
+    );
 
     console.log('[Kontur] Плагин инициализирован успешно');
   }
@@ -215,342 +267,243 @@ class KonturMeetingPlugin {
     }
   }
 
-  /**
-   * Get the other user in a DM channel
-   * @param {Object} channel - Channel object
-   * @param {string} currentUserId - Current user ID
-   * @returns {Object|null} User object or null
-   */
-  getDMOtherUser(channel, currentUserId) {
-    // DM канал имеет name формата: "user1_id__user2_id"
-    if (channel.type !== 'D') {
-      return null;
-    }
-    
-    const userIds = channel.name.split('__');
-    const otherUserId = userIds.find(id => id !== currentUserId);
-    
-    if (!otherUserId) {
-      return null;
-    }
-    
-    // Получить из Redux store (БЕЗ API запроса)
-    const state = this.store.getState();
-    const user = state.entities.users.profiles[otherUserId];
-    
-    if (!user) {
-      // Если пользователя нет в store - вернуть null (будет запрошен через API в handleScheduleMeeting)
-      return null;
-    }
-    
-    return {
-      user_id: user.id,
-      username: user.username,
-      email: user.email || null,
-      first_name: user.first_name || null,
-      last_name: user.last_name || null
-    };
-  }
 
   /**
-   * Get user by ID via API
-   * @param {string} userId - User ID
-   * @returns {Promise<Object|null>} User object or null
-   */
-  async getUserById(userId) {
-    try {
-      const response = await fetch(`/api/v4/users/${userId}`, {
-        method: 'GET',
-        credentials: 'same-origin',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        }
-      });
-      
-      if (!response.ok) {
-        return null;
-      }
-      
-      const user = await response.json();
-      return {
-        user_id: user.id,
-        username: user.username,
-        email: user.email || null,
-        first_name: user.first_name || null,
-        last_name: user.last_name || null
-      };
-    } catch (error) {
-      console.error('[Kontur] Ошибка получения пользователя:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get help text for participants field
-   * @param {string} channelType - Channel type ("D", "O", "P", "G")
-   * @param {Object|null} otherUser - Other user in DM (if exists)
-   * @returns {string} Help text
-   */
-  getParticipantsHelpText(channelType, otherUser) {
-    if (channelType === 'D' && otherUser) {
-      return `Рекомендуем добавить: @${otherUser.username}. Выберите участников через поиск.`;
-    } else if (channelType === 'O' || channelType === 'P' || channelType === 'G') {
-      return 'Выберите участников через поиск (можно искать по username, имени, фамилии). Обязательное поле.';
-    }
-    return 'Выберите участников через поиск (можно искать по username, имени, фамилии).';
-  }
-
-  /**
-   * Parse participants from submission
-   * @param {string|Array|null} participants - Participants from submission
-   * @param {Object} state - Redux store state
-   * @returns {Array} Array of user objects
-   */
-  parseParticipants(participants, state) {
-    // Mattermost может вернуть:
-    // 1. Массив: ["user1", "user2"]
-    // 2. Строку через запятую: "user1,user2"
-    // 3. null или undefined
-    
-    if (!participants) {
-      return [];
-    }
-    
-    // Универсальная обработка
-    let participantIds = [];
-    
-    if (typeof participants === 'string') {
-      participantIds = participants.split(',').map(id => id.trim()).filter(Boolean);
-    } else if (Array.isArray(participants)) {
-      participantIds = participants;
-    } else {
-      return [];
-    }
-    
-    // Получить информацию о пользователях из Redux store
-    const profiles = state.entities.users.profiles;
-    const result = [];
-    
-    for (const userId of participantIds) {
-      const user = profiles[userId];
-      if (user) {
-        result.push({
-          user_id: user.id,
-          username: user.username,
-          email: user.email || null,
-          first_name: user.first_name || null,
-          last_name: user.last_name || null
-        });
-      }
-    }
-    
-    return result;
-  }
-
-  /**
-   * Validate schedule dialog submission
-   * @param {Object} submission - Dialog submission data
-   * @param {string} channelType - Channel type ("D", "O", "P", "G")
-   * @returns {Object} Errors object {field_name: "error message"} or {} if no errors
-   */
-  validateScheduleDialog(submission, channelType) {
-    const errors = {};
-    
-    // Валидация даты и времени
-    if (!submission.meeting_datetime) {
-      errors.meeting_datetime = "Дата и время обязательны";
-    } else {
-      // submission.meeting_datetime - Unix timestamp в СЕКУНДАХ (integer)
-      const scheduledAt = new Date(submission.meeting_datetime * 1000); // Умножить на 1000!
-      const now = new Date();
-      const maxDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 дней
-      
-      if (scheduledAt < now) {
-        errors.meeting_datetime = "Дата и время не могут быть в прошлом";
-      }
-      
-      if (scheduledAt > maxDate) {
-        errors.meeting_datetime = "Дата не может быть более чем через 30 дней";
-      }
-    }
-    
-    // Валидация продолжительности
-    if (!submission.duration) {
-      errors.duration = "Продолжительность обязательна";
-    } else {
-      const duration = parseInt(submission.duration, 10);
-      if (isNaN(duration) || duration < 5) {
-        errors.duration = "Продолжительность должна быть не менее 5 минут";
-      } else if (duration > 480) {
-        errors.duration = "Продолжительность не может превышать 480 минут (8 часов)";
-      }
-    }
-    
-    // Валидация названия (если заполнено)
-    if (submission.meeting_title && submission.meeting_title.length > 100) {
-      errors.meeting_title = "Название не может быть длиннее 100 символов";
-    }
-    
-    // Валидация участников для каналов и Group DM
-    if (channelType === 'O' || channelType === 'P' || channelType === 'G') {
-      const state = this.store.getState();
-      const participants = this.parseParticipants(submission.participants, state);
-      if (participants.length === 0) {
-        errors.participants = "Выберите хотя бы одного участника";
-      }
-    }
-    
-    // Валидация участников для DM
-    if (channelType === 'D') {
-      const state = this.store.getState();
-      const participants = this.parseParticipants(submission.participants, state);
-      if (participants.length === 0) {
-        errors.participants = "Выберите хотя бы одного участника";
-      }
-    }
-    
-    return errors;
-  }
-
-  /**
-   * Format date and time for display
-   * @param {Date} date - Date object
-   * @returns {string} Formatted date string
-   */
-  formatDateTime(date) {
-    const options = {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZoneName: 'short'
-    };
-    return date.toLocaleString('ru-RU', options);
-  }
-
-  /**
-   * Handle schedule meeting - open Interactive Dialog
+   * Show meeting dropdown menu
    * @param {Object} channel - Current channel object
    */
-  async handleScheduleMeeting(channel) {
-    console.log('[Kontur] Открытие диалога планирования встречи:', {
+  showMeetingDropdown(channel) {
+    // Закрыть предыдущий dropdown если открыт
+    if (this.currentDropdown) {
+      this.currentDropdown.remove();
+      this.currentDropdown = null;
+    }
+
+    // Найти channel header для позиционирования
+    const header = document.querySelector('.channel-header__links') || 
+                   document.querySelector('.channel-header');
+    
+    if (!header) {
+      console.error('[Kontur] Channel header not found');
+      return;
+    }
+
+    // Получить позицию header
+    const rect = header.getBoundingClientRect();
+
+    // Создать dropdown элемент
+    const dropdown = document.createElement('div');
+    dropdown.className = 'kontur-meeting-dropdown';
+    dropdown.style.cssText = `
+      position: fixed;
+      background: var(--center-channel-bg, #fff);
+      border: 1px solid var(--center-channel-color-16, rgba(0,0,0,0.1));
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      z-index: 10000;
+      min-width: 200px;
+      padding: 4px 0;
+    `;
+    
+    // Добавить в DOM
+    document.body.appendChild(dropdown);
+    
+    // Позиционировать относительно channel header
+    dropdown.style.top = `${rect.bottom + 4}px`;
+    dropdown.style.right = '16px';
+
+    // Создать кнопку "Созвониться сейчас"
+    const instantBtn = document.createElement('button');
+    instantBtn.textContent = '📹 Созвониться сейчас';
+    instantBtn.style.cssText = `
+      width: 100%;
+      padding: 8px 16px;
+      text-align: left;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--center-channel-color, #333);
+      font-size: 14px;
+    `;
+    instantBtn.onmouseenter = () => {
+      instantBtn.style.background = 'var(--center-channel-color-08, rgba(0,0,0,0.05))';
+    };
+    instantBtn.onmouseleave = () => {
+      instantBtn.style.background = 'transparent';
+    };
+    instantBtn.onclick = () => {
+      this.handleInstantCall(channel);
+      this.closeDropdown();
+    };
+    dropdown.appendChild(instantBtn);
+
+    // Создать разделитель
+    const divider = document.createElement('div');
+    divider.style.cssText = `
+      height: 1px;
+      background: var(--center-channel-color-16, rgba(0,0,0,0.1));
+      margin: 4px 0;
+    `;
+    dropdown.appendChild(divider);
+
+    // Создать кнопку "Запланировать встречу"
+    const scheduleBtn = document.createElement('button');
+    scheduleBtn.textContent = '📅 Запланировать встречу';
+    scheduleBtn.style.cssText = `
+      width: 100%;
+      padding: 8px 16px;
+      text-align: left;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--center-channel-color, #333);
+      font-size: 14px;
+    `;
+    scheduleBtn.onmouseenter = () => {
+      scheduleBtn.style.background = 'var(--center-channel-color-08, rgba(0,0,0,0.05))';
+    };
+    scheduleBtn.onmouseleave = () => {
+      scheduleBtn.style.background = 'transparent';
+    };
+    scheduleBtn.onclick = () => {
+      this.handleScheduleMeeting(channel);
+      this.closeDropdown();
+    };
+    dropdown.appendChild(scheduleBtn);
+
+    // Dropdown уже добавлен в DOM выше для измерения размера
+    this.currentDropdown = dropdown;
+
+    // Закрытие при клике вне dropdown
+    const closeDropdown = (e) => {
+      if (this.currentDropdown && !this.currentDropdown.contains(e.target)) {
+        // Проверить, что клик не по кнопке плагина
+        const button = document.querySelector('[data-plugin-id="kontur-meeting-button"]');
+        if (!button || !button.contains(e.target)) {
+          this.closeDropdown();
+        }
+      }
+    };
+    
+    // Использовать setTimeout чтобы не сработал сразу клик по кнопке
+    setTimeout(() => {
+      document.addEventListener('mousedown', closeDropdown);
+      this.dropdownCloseHandler = closeDropdown;
+    }, 0);
+  }
+
+  /**
+   * Close dropdown menu
+   */
+  closeDropdown() {
+    if (this.currentDropdown) {
+      this.currentDropdown.remove();
+      this.currentDropdown = null;
+    }
+    if (this.dropdownCloseHandler) {
+      document.removeEventListener('mousedown', this.dropdownCloseHandler);
+      this.dropdownCloseHandler = null;
+    }
+  }
+
+  /**
+   * Open schedule meeting modal
+   * @param {Object} channel - Current channel object
+   */
+  openScheduleModal(channel) {
+    console.log('[Kontur] Открытие модального окна планирования встречи:', {
       channel: channel.display_name || channel.name,
       channelId: channel.id,
       channelType: channel.type
     });
 
-    try {
-      // Check if webhook URL is configured
-      if (!this.config || !this.config.WebhookURL) {
-        alert('⚠️ URL вебхука Kontur.Talk не настроен.\n\nОбратитесь к системному администратору для настройки в:\nКонсоль системы → Плагины → Kontur.Talk Meeting → Настройки');
-        return;
-      }
+    // Check if webhook URL is configured
+    if (!this.config || !this.config.WebhookURL) {
+      alert('⚠️ URL вебхука Kontur.Talk не настроен.\n\nОбратитесь к системному администратору для настройки в:\nКонсоль системы → Плагины → Kontur.Talk Meeting → Настройки');
+      return;
+    }
 
-      // Get current user info
-      const state = this.store.getState();
-      const currentUserId = state.entities.users.currentUserId;
-      
-      // Get other user for DM channel
-      let otherUser = null;
-      if (channel.type === 'D') {
-        otherUser = this.getDMOtherUser(channel, currentUserId);
-        // Если не найден в store, попробуем через API
-        if (!otherUser) {
-          const userIds = channel.name.split('__');
-          const otherUserId = userIds.find(id => id !== currentUserId);
-          if (otherUserId) {
-            otherUser = await this.getUserById(otherUserId);
+    this.currentChannel = channel;
+    this.isModalOpen = true;
+    this.renderModal();
+  }
+
+  /**
+   * Close schedule meeting modal
+   */
+  closeScheduleModal() {
+    this.isModalOpen = false;
+    this.currentChannel = null;
+    this.renderModal();
+  }
+
+  /**
+   * Render modal based on isModalOpen state
+   */
+  renderModal() {
+    const React = window.React;
+    const ReactDOM = window.ReactDOM;
+
+    if (!React || !ReactDOM) {
+      console.error('[Kontur] React не доступен. Проверьте версию Mattermost.');
+      return;
+    }
+
+    // Создать контейнер для модального окна если его нет
+    if (!this.modalContainer) {
+      this.modalContainer = document.createElement('div');
+      this.modalContainer.id = 'kontur-meeting-modal-container';
+      document.body.appendChild(this.modalContainer);
+    }
+
+    // Условный рендеринг модалки на основе isModalOpen
+    if (this.isModalOpen && this.currentChannel) {
+      // Рендерить модальное окно
+      this.currentModal = ReactDOM.render(
+        React.createElement(ScheduleMeetingModal, {
+          channel: this.currentChannel,
+          onClose: () => {
+            console.log('[Kontur] Модальное окно закрыто - вызов closeScheduleModal');
+            this.closeScheduleModal();
+          },
+          onSuccess: () => {
+            console.log('[Kontur] Meeting scheduled successfully - вызов closeScheduleModal');
+            this.closeScheduleModal();
+          }
+        }),
+        this.modalContainer
+      );
+    } else {
+      // Размонтировать модалку если она закрыта
+      if (this.modalContainer) {
+        try {
+          // Проверить, есть ли что размонтировать
+          const hasChildNodes = this.modalContainer.hasChildNodes();
+          if (hasChildNodes || this.currentModal) {
+            ReactDOM.unmountComponentAtNode(this.modalContainer);
+            // Очистить контейнер
+            this.modalContainer.innerHTML = '';
+          }
+        } catch (error) {
+          console.error('[Kontur] Ошибка при размонтировании модалки:', error);
+          // Принудительно очистить контейнер
+          if (this.modalContainer) {
+            this.modalContainer.innerHTML = '';
           }
         }
+        this.currentModal = null;
       }
-
-      // Build Interactive Dialog structure
-      const dialog = {
-        title: 'Запланировать встречу Kontur.Talk',
-        introduction: 'Заполните форму для создания запланированной встречи',
-        elements: [
-          {
-            display_name: 'Дата и время встречи',
-            name: 'meeting_datetime',
-            type: 'datetime',
-            optional: false
-          },
-          {
-            display_name: 'Продолжительность',
-            name: 'duration',
-            type: 'select',
-            placeholder: 'Выберите продолжительность',
-            help_text: 'Обязательное поле. Длительность встречи в минутах.',
-            optional: false,
-            options: [
-              {text: '15 минут', value: '15'},
-              {text: '30 минут', value: '30'},
-              {text: '45 минут', value: '45'},
-              {text: '1 час', value: '60'},
-              {text: '1.5 часа', value: '90'},
-              {text: '2 часа', value: '120'},
-              {text: '3 часа', value: '180'},
-              {text: '4 часа', value: '240'}
-            ],
-            default: '60' // По умолчанию 1 час
-          },
-          {
-            display_name: 'Название встречи',
-            name: 'meeting_title',
-            type: 'text',
-            placeholder: 'Обсуждение проекта',
-            help_text: 'Опционально, максимум 100 символов',
-            optional: true,
-            default: channel.display_name || channel.name
-          },
-          {
-            display_name: 'Участники',
-            name: 'participants',
-            type: 'select',
-            data_source: 'users',
-            multiselect: true,
-            placeholder: 'Выберите участников',
-            help_text: this.getParticipantsHelpText(channel.type, otherUser),
-            optional: channel.type === 'D' ? false : false // Всегда обязательно согласно ТЗ
-          }
-        ],
-        submit_label: 'Создать встречу',
-        notify_on_cancel: false
-      };
-
-      // Open Interactive Dialog
-      const dialogData = {
-        url: '/plugins/com.skyeng.kontur-meeting/schedule-submit',
-        dialog: dialog,
-        context: {
-          channel_id: channel.id,
-          channel_type: channel.type
-        }
-      };
-
-      console.log('[Kontur] Открытие Interactive Dialog', dialogData);
-      
-      // Используем Mattermost API для открытия диалога
-      // В Mattermost 7.8.0+ используется registry.openInteractiveDialog
-      if (this.registry && this.registry.openInteractiveDialog) {
-        this.registry.openInteractiveDialog(dialogData);
-      } else if (window.mm_openInteractiveDialog) {
-        // Fallback для старых версий
-        window.mm_openInteractiveDialog(dialogData);
-      } else {
-        throw new Error('Не удалось открыть Interactive Dialog. Проверьте версию Mattermost (требуется 7.8.0+)');
-      }
-
-    } catch (error) {
-      console.error('[Kontur] Ошибка при открытии диалога планирования:', {
-        message: error.message,
-        stack: error.stack
-      });
-      alert('❌ Не удалось открыть диалог планирования встречи.\n\n' + error.message);
     }
   }
+
+  /**
+   * Handle schedule meeting - open custom React modal
+   * @param {Object} channel - Current channel object
+   */
+  handleScheduleMeeting(channel) {
+    this.openScheduleModal(channel);
+  }
+
 
 }
 
