@@ -340,6 +340,10 @@ func (p *Plugin) sendWebhook(webhookURL string, payload map[string]interface{}) 
 			return nil, fmt.Errorf("failed to parse response (status %d): %w", resp.StatusCode, err)
 		}
 	} else {
+		// Empty body is an error - webhook should return JSON
+		if resp.StatusCode == http.StatusOK {
+			return nil, fmt.Errorf("webhook returned empty response (status %d)", resp.StatusCode)
+		}
 		webhookData = make(map[string]interface{})
 	}
 

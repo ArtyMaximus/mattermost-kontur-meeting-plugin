@@ -239,6 +239,14 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 		roomURL = url
 	}
 
+	// Step 7.5: Validate room URL - don't create post without it
+	if roomURL == "" {
+		p.API.LogWarn("[Kontur] room_url пустой, пост не будет создан", "webhook_response", fmt.Sprintf("%+v", webhookData))
+		writeErrorResponse(w, http.StatusBadGateway, RequestFieldGeneral, 
+			"Вебхук не вернул ссылку на комнату. Встреча не была создана.")
+		return
+	}
+
 	// Step 8: Create post in channel
 	if err := p.createPost(channel, currentUser, participants, scheduledAt, req.DurationMinutes, roomURL); err != nil {
 		// Don't fail the request if post creation fails (meeting is already created)

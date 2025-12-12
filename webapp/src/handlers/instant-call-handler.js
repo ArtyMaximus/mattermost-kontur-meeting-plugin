@@ -74,22 +74,42 @@ export async function handleInstantCall(channel, pluginCore) {
       throw new Error(`Вебхук вернул ошибку: ${webhookResponse.status} ${webhookResponse.statusText}`);
     }
 
-    const webhookData = await webhookResponse.json();
-    logger.debug('Ответ от вебхука:', webhookData);
+    // Safely parse response - handle empty body
+    let webhookData = null;
+    const responseText = await webhookResponse.text();
+    
+    if (responseText) {
+      try {
+        webhookData = JSON.parse(responseText);
+        logger.debug('Ответ от вебхука:', webhookData);
+      } catch (e) {
+        logger.error('[Meeting] Не удалось распарсить JSON ответа вебхука', {
+          error: e.message,
+          responseText: responseText.substring(0, 200) // Log first 200 chars
+        });
+        alert('❌ Вебхук вернул некорректный ответ. Обратитесь в ~ai-automation-center.');
+        return;
+      }
+    } else {
+      // Empty response - this is an error
+      logger.error('[Meeting] Пустой ответ от вебхука при создании быстрого созвона');
+      alert('❌ Вебхук не вернул данные для встречи. Обратитесь в ~ai-automation-center.');
+      return;
+    }
 
     // Check if meeting_url or room_url is present in response
-    const roomUrl = webhookData.meeting_url || webhookData.room_url;
+    const roomUrl = webhookData?.meeting_url || webhookData?.room_url;
     
     if (!roomUrl) {
       // Если нет URL, но есть success: true, просто показываем сообщение
-      if (webhookData.success) {
+      if (webhookData?.success) {
         const serviceName = pluginCore.getServiceName();
         const serviceText = serviceName ? ` ${serviceName}` : ' видеосвязи';
         alert(`✅ Комната${serviceText} создана!`);
         return;
       }
       logger.warn('Неожиданный ответ от вебхука:', webhookData);
-      alert('✅ Запрос отправлен.');
+      alert('❌ Вебхук не вернул ссылку на комнату. Обратитесь в ~ai-automation-center.');
       return;
     }
 
