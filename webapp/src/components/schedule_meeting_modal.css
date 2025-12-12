@@ -1,0 +1,230 @@
+/* Schedule Meeting Modal Styles */
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--center-channel-color-64, rgba(0, 0, 0, 0.5));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.modalContent {
+  background-color: var(--center-channel-bg, #fff);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 24px;
+}
+
+.modalTitle {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--center-channel-color, #000);
+}
+
+.modalDescription {
+  margin: 0 0 24px 0;
+  font-size: 14px;
+  color: var(--center-channel-color-64, #666);
+}
+
+.formSection {
+  margin-bottom: 20px;
+}
+
+.formLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--center-channel-color, #000);
+}
+
+.formLabelRequired {
+  color: red;
+}
+
+.formInput {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--center-channel-color-16, #ccc);
+  border-radius: 4px;
+  background-color: var(--center-channel-bg, #fff);
+  color: var(--center-channel-color, #000);
+}
+
+.formInputError {
+  border-color: red;
+}
+
+.formInputReadonly {
+  cursor: pointer;
+}
+
+.formSelect {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--center-channel-color-16, #ccc);
+  border-radius: 4px;
+  background-color: var(--center-channel-bg, #fff);
+  color: var(--center-channel-color, #000);
+}
+
+.formSelectError {
+  border-color: red;
+}
+
+.formError {
+  color: red;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.formHint {
+  color: var(--center-channel-color-64, #666);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.dateInputContainer {
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.timeSelectContainer {
+  margin-bottom: 12px;
+}
+
+.timeSelects {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.timeSelect {
+  flex: 1;
+}
+
+.timeSeparator {
+  color: var(--center-channel-color, #000);
+  font-size: 14px;
+}
+
+.timePresets {
+  margin-top: 8px;
+  padding: 12px;
+  background-color: var(--center-channel-color-08, #f5f5f5);
+  border-radius: 4px;
+  border: 1px solid var(--center-channel-color-16, #e0e0e0);
+}
+
+.timePresetsTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--center-channel-color-64, #666);
+  margin-bottom: 8px;
+}
+
+.timePresetsButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.timePresetButton {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--center-channel-color-16, #ccc);
+  border-radius: 4px;
+  background-color: var(--center-channel-bg, #fff);
+  color: var(--center-channel-color, #000);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.participantSearchContainer {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.participantsList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.participantTag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background-color: var(--center-channel-color-08, #f0f0f0);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.participantRemoveButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--center-channel-color, #000);
+  font-size: 16px;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--center-channel-color-16, #eee);
+}
+
+.button {
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.buttonCancel {
+  border: 1px solid var(--center-channel-color-16, #ccc);
+  background-color: transparent;
+  color: var(--center-channel-color, #000);
+}
+
+.buttonCancel:disabled {
+  cursor: not-allowed;
+}
+
+.buttonSubmit {
+  border: none;
+  background-color: var(--button-bg, #2389D7);
+  color: var(--button-color, #fff);
+  font-weight: 600;
+}
+
+.buttonSubmit:disabled {
+  background-color: var(--center-channel-color-32, #999);
+  cursor: not-allowed;
+}
+
+

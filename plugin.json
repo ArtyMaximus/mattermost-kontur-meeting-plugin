@@ -36,6 +36,31 @@
         "type": "bool",
         "help_text": "Если включено, ссылка на встречу автоматически откроется в новой вкладке браузера",
         "default": true
+      },
+      {
+        "key": "ServiceName",
+        "display_name": "Название сервиса видеосвязи",
+        "type": "text",
+        "help_text": "Название сервиса, которое будет отображаться в интерфейсе (например, Kontur.Talk, Zoom, Google Meet)",
+        "placeholder": "Kontur.Talk",
+        "default": "Kontur.Talk"
+      },
+      {
+        "key": "LogLevel",
+        "display_name": "Уровень логирования",
+        "type": "radio",
+        "help_text": "Уровень детализации логов. DEBUG - все логи, INFO - только критические события",
+        "options": [
+          {
+            "display_name": "Info (только критические события)",
+            "value": "INFO"
+          },
+          {
+            "display_name": "Debug (все логи)",
+            "value": "DEBUG"
+          }
+        ],
+        "default": "INFO"
       }
     ]
   }
