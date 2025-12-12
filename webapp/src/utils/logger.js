@@ -1,28 +1,28 @@
 // Logger utility with debug mode support
-// Set window.KONTUR_DEBUG = true in browser console to enable debug logs
+// Set window.MEETING_DEBUG = true in browser console to enable debug logs
 
-const DEBUG = typeof window !== 'undefined' && window.KONTUR_DEBUG === true;
+const DEBUG = typeof window !== 'undefined' && (window.MEETING_DEBUG === true || window.KONTUR_DEBUG === true);
 
 export const logger = {
   log: (...args) => {
     if (DEBUG) {
-      console.log('[Kontur]', ...args);
+      console.log('[Meeting]', ...args);
     }
   },
   
   error: (...args) => {
     // Errors are always logged
-    console.error('[Kontur]', ...args);
+    console.error('[Meeting]', ...args);
   },
   
   warn: (...args) => {
     // Warnings are always logged
-    console.warn('[Kontur]', ...args);
+    console.warn('[Meeting]', ...args);
   },
   
   info: (...args) => {
     if (DEBUG) {
-      console.info('[Kontur]', ...args);
+      console.info('[Meeting]', ...args);
     }
   }
 };
