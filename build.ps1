@@ -1,7 +1,7 @@
-# Build and package Mattermost Kontur.Talk plugin
+# Build and package Mattermost Meeting Plugin
 # Usage: .\build.ps1
 
-Write-Host "Building Kontur.Talk Meeting Plugin..." -ForegroundColor Cyan
+Write-Host "Building Meeting Plugin..." -ForegroundColor Cyan
 
 # Check if Go is installed
 $goVersion = go version 2>$null

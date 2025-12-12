@@ -54,12 +54,13 @@ class KonturMeetingPlugin {
     }
 
     // Register channel header button - opens React dropdown component
+    const serviceName = this.config?.ServiceName || 'видеосвязи';
     registry.registerChannelHeaderButtonAction(
       icon,
       (channel, channelMember) => {
         this.openDropdown(channel, channelMember);
       },
-      'Создать встречу Kontur.Talk',
+      serviceName ? `Создать встречу ${serviceName}` : 'Создать встречу',
       'kontur-meeting-button'
     );
 
@@ -93,13 +94,20 @@ class KonturMeetingPlugin {
       if (this.config.open_in_new_tab !== undefined) {
         this.config.OpenInNewTab = this.config.open_in_new_tab;
       }
+      if (this.config.service_name) {
+        this.config.ServiceName = this.config.service_name;
+      } else {
+        // Default fallback - use generic term if not configured
+        this.config.ServiceName = '';
+      }
       
       logger.log('Конфигурация получена от сервера', this.config);
     } catch (error) {
       logger.error('Ошибка загрузки конфигурации', error);
       this.config = { 
         WebhookURL: '',
-        OpenInNewTab: true
+        OpenInNewTab: true,
+        ServiceName: ''
       };
     }
   }
@@ -118,7 +126,9 @@ class KonturMeetingPlugin {
     try {
       // Check if webhook URL is configured
       if (!this.config || !this.config.WebhookURL) {
-        alert('⚠️ URL вебхука Kontur.Talk не настроен.\n\nОбратитесь к системному администратору для настройки в:\nКонсоль системы → Плагины → Kontur.Talk Meeting → Настройки');
+        const serviceName = this.config?.ServiceName;
+        const serviceText = serviceName ? ` ${serviceName}` : ' видеосвязи';
+        alert(`⚠️ URL вебхука${serviceText} не настроен.\n\nОбратитесь к системному администратору для настройки в:\nКонсоль системы → Плагины → Kontur.Talk Meeting → Настройки`);
         return;
       }
 
@@ -179,7 +189,9 @@ class KonturMeetingPlugin {
       if (!roomUrl) {
         // Если нет URL, но есть success: true, просто показываем сообщение
         if (webhookData.success) {
-          alert('✅ Комната Kontur.Talk создана!');
+          const serviceName = this.config?.ServiceName;
+          const serviceText = serviceName ? ` ${serviceName}` : ' видеосвязи';
+          alert(`✅ Комната${serviceText} создана!`);
           return;
         }
         logger.warn('Неожиданный ответ от вебхука:', webhookData);
@@ -411,7 +423,9 @@ class KonturMeetingPlugin {
 
     // Check if webhook URL is configured
     if (!this.config || !this.config.WebhookURL) {
-      alert('⚠️ URL вебхука Kontur.Talk не настроен.\n\nОбратитесь к системному администратору для настройки в:\nКонсоль системы → Плагины → Kontur.Talk Meeting → Настройки');
+      const serviceName = this.config?.ServiceName;
+      const serviceText = serviceName ? ` ${serviceName}` : ' видеосвязи';
+      alert(`⚠️ URL вебхука${serviceText} не настроен.\n\nОбратитесь к системному администратору для настройки в:\nКонсоль системы → Плагины → Kontur.Talk Meeting → Настройки`);
       return;
     }
 

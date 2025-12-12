@@ -495,6 +495,10 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     };
   }, [showCalendar]);
 
+  // Get service name from config
+  const config = window.KonturMeetingPlugin && window.KonturMeetingPlugin.config;
+  const serviceName = config?.ServiceName || '';
+
   return (
     <div
       style={{
@@ -530,7 +534,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
           fontWeight: '600',
           color: 'var(--center-channel-color, #000)'
         }}>
-          Запланировать встречу Kontur.Talk
+          {serviceName ? `Запланировать встречу ${serviceName}` : 'Запланировать встречу'}
         </h2>
 
         <p style={{

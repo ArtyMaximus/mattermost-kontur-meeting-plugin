@@ -36,6 +36,14 @@
         "type": "bool",
         "help_text": "Если включено, ссылка на встречу автоматически откроется в новой вкладке браузера",
         "default": true
+      },
+      {
+        "key": "ServiceName",
+        "display_name": "Название сервиса видеосвязи",
+        "type": "text",
+        "help_text": "Название сервиса, которое будет отображаться в интерфейсе (например, Kontur.Talk, Zoom, Google Meet)",
+        "placeholder": "Kontur.Talk",
+        "default": "Kontur.Talk"
       }
     ]
   }

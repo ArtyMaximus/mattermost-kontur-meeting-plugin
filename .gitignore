@@ -57,3 +57,7 @@ coverage/
 # Mattermost configuration (contains sensitive info)
 mattermost-config.json
 
+# Documentation files (except README.md)
+*.md
+!README.md
+

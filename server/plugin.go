@@ -18,6 +18,7 @@ type Plugin struct {
 type Configuration struct {
 	WebhookURL   string
 	OpenInNewTab bool
+	ServiceName  string
 }
 
 // OnActivate is called when the plugin is activated
@@ -84,6 +85,7 @@ func (p *Plugin) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	response := map[string]interface{}{
 		"webhook_url":     config.WebhookURL,
 		"open_in_new_tab": config.OpenInNewTab,
+		"service_name":    config.ServiceName,
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -108,6 +110,7 @@ func (p *Plugin) getConfiguration() *Configuration {
 		return &Configuration{
 			WebhookURL:   "",
 			OpenInNewTab: true,
+			ServiceName:  "",
 		}
 	}
 

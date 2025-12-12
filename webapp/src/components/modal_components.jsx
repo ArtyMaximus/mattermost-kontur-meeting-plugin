@@ -409,3 +409,4 @@ ParticipantSelector.propTypes = {
   searchInputRef: PropTypes.object.isRequired
 };
 
+

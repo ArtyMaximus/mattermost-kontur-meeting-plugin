@@ -39,6 +39,10 @@ const KonturMeetingDropdown = ({channel, channelMember, theme}) => {
     }
   };
   
+  // Get service name from config
+  const config = window.KonturMeetingPlugin && window.KonturMeetingPlugin.config;
+  const serviceName = config?.ServiceName || '';
+  
   return (
     <div ref={dropdownRef} style={{position: 'relative', display: 'inline-block'}}>
       <button
@@ -50,7 +54,7 @@ const KonturMeetingDropdown = ({channel, channelMember, theme}) => {
           padding: '4px 8px',
           color: 'var(--center-channel-color)'
         }}
-        title="Создать встречу Kontur.Talk"
+        title={serviceName ? `Создать встречу ${serviceName}` : 'Создать встречу'}
       >
         <KonturIcon size={20} />
       </button>
