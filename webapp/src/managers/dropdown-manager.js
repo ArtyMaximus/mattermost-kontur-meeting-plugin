@@ -17,16 +17,19 @@ export class DropdownManager {
     this.dropdownContainer = null;
     this.onInstantCall = null;
     this.onScheduleMeeting = null;
+    this.onAboutPlugin = null;
   }
 
   /**
    * Set callbacks for dropdown actions
    * @param {Function} onInstantCall - Callback for instant call
    * @param {Function} onScheduleMeeting - Callback for schedule meeting
+   * @param {Function} onAboutPlugin - Callback for about plugin
    */
-  setCallbacks(onInstantCall, onScheduleMeeting) {
+  setCallbacks(onInstantCall, onScheduleMeeting, onAboutPlugin) {
     this.onInstantCall = onInstantCall;
     this.onScheduleMeeting = onScheduleMeeting;
+    this.onAboutPlugin = onAboutPlugin;
   }
 
   /**
@@ -125,6 +128,13 @@ export class DropdownManager {
         manager.closeDropdown();
       };
 
+      const handleAboutPlugin = () => {
+        if (manager.onAboutPlugin) {
+          manager.onAboutPlugin();
+        }
+        manager.closeDropdown();
+      };
+
       // Find channel header position
       const header = document.querySelector('.channel-header__links') || 
                      document.querySelector('.channel-header');
@@ -198,6 +208,36 @@ export class DropdownManager {
               }
             },
             '📅 Запланировать встречу'
+          ),
+          // Divider
+          createElementWithProps('div', {
+            key: 'divider2',
+            style: {
+              height: '1px',
+              background: 'var(--center-channel-color-16, rgba(0,0,0,0.1))',
+              margin: '4px 0'
+            }
+          }),
+          // About plugin button
+          createElementWithProps(
+            'button',
+            {
+              key: 'about',
+              onClick: handleAboutPlugin,
+              onMouseEnter: (e) => e.target.style.background = 'var(--center-channel-color-08, rgba(0,0,0,0.05))',
+              onMouseLeave: (e) => e.target.style.background = 'transparent',
+              style: {
+                width: '100%',
+                padding: '8px 16px',
+                textAlign: 'left',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--center-channel-color, #333)',
+                fontSize: '14px'
+              }
+            },
+            'ℹ️ О плагине'
           )
         ]
       );

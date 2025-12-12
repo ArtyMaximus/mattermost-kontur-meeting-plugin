@@ -51,7 +51,8 @@ class KonturMeetingPlugin {
     // Set up dropdown callbacks
     this.dropdownManager.setCallbacks(
       (channel) => this.handleInstantCall(channel),
-      (channel) => this.handleScheduleMeeting(channel)
+      (channel) => this.handleScheduleMeeting(channel),
+      () => this.handleAboutPlugin()
     );
 
     // Create icon for channel header button
@@ -126,6 +127,27 @@ class KonturMeetingPlugin {
    */
   handleScheduleMeeting(channel) {
     this.modalManager.openScheduleModal(channel);
+  }
+
+  /**
+   * Handle about plugin - open about modal (public API)
+   */
+  handleAboutPlugin() {
+    this.modalManager.openAboutModal();
+  }
+
+  /**
+   * Open about plugin modal (public API)
+   */
+  openAboutModal() {
+    this.modalManager.openAboutModal();
+  }
+
+  /**
+   * Close about plugin modal (public API)
+   */
+  closeAboutModal() {
+    this.modalManager.closeAboutModal();
   }
 
   /**
