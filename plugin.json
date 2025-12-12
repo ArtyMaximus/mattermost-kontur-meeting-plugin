@@ -26,8 +26,8 @@
         "key": "WebhookURL",
         "display_name": "URL вебхука n8n",
         "type": "text",
-        "help_text": "Полный URL вашего n8n webhook (например, `https://n8n.skyeng.tech/webhook/60ca5991-...`)",
-        "placeholder": "https://n8n.skyeng.tech/webhook/...",
+        "help_text": "Полный URL вашего n8n webhook (например, `https://n8n.example.com/webhook/60ca5991-...`)",
+        "placeholder": "https://n8n.example.com/webhook/...",
         "default": ""
       },
       {
