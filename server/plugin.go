@@ -190,6 +190,32 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 	webhookPayload := p.buildWebhookPayload(req, currentUser, channel, participants, scheduledAt)
 	webhookData, err := p.sendWebhook(config.WebhookURL, webhookPayload)
 	if err != nil {
+		// Check if this is a structured n8n error
+		if webhookErr, ok := IsWebhookError(err); ok {
+			// Log with execution_id for debugging
+			if webhookErr.ExecutionID != "" {
+				p.API.LogError("[Kontur] Webhook returned error from n8n", 
+					"error", webhookErr.Message,
+					"execution_id", webhookErr.ExecutionID,
+					"status_code", webhookErr.StatusCode)
+			} else {
+				p.API.LogError("[Kontur] Webhook returned error from n8n", 
+					"error", webhookErr.Message,
+					"status_code", webhookErr.StatusCode)
+			}
+			
+			// Return n8n error message to user
+			// Use the status code from n8n, but default to 400 if it's not a client error
+			statusCode := webhookErr.StatusCode
+			if statusCode < 400 || statusCode >= 500 {
+				statusCode = http.StatusBadRequest
+			}
+			
+			writeErrorResponse(w, statusCode, RequestFieldGeneral, webhookErr.Message)
+			return
+		}
+		
+		// Network or other non-n8n errors
 		p.API.LogError("[Kontur] Webhook request failed", "error", err.Error())
 		
 		// Detailed error message for webhook failures
@@ -201,7 +227,7 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 		errorMsg += "2. Workflow активирован\n"
 		errorMsg += "3. URL указан правильно"
 		
-		writeErrorResponse(w, http.StatusInternalServerError, "general", errorMsg)
+		writeErrorResponse(w, http.StatusInternalServerError, RequestFieldGeneral, errorMsg)
 		return
 	}
 

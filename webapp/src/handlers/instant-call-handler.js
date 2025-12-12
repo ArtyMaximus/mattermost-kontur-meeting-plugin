@@ -94,7 +94,7 @@ export async function handleInstantCall(channel, pluginCore) {
     }
 
     // Create post in the channel
-    await pluginCore.createPost(channel.id, `Я создал встречу: ${roomUrl}`);
+    await pluginCore.createPost(channel.id, `📞 Я создал встречу: ${roomUrl}`);
 
     // Open meeting room in new tab (default: true)
     const openInNewTab = pluginCore.shouldOpenInNewTab();

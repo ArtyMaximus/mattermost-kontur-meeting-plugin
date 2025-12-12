@@ -11,6 +11,24 @@ import (
 	"github.com/mattermost/mattermost-server/v6/model"
 )
 
+// WebhookError represents a structured error response from n8n webhook
+type WebhookError struct {
+	Message     string
+	ExecutionID string
+	StatusCode  int
+}
+
+// Error implements the error interface
+func (e *WebhookError) Error() string {
+	return e.Message
+}
+
+// IsWebhookError checks if an error is a WebhookError
+func IsWebhookError(err error) (*WebhookError, bool) {
+	webhookErr, ok := err.(*WebhookError)
+	return webhookErr, ok
+}
+
 // ScheduleRequest represents the schedule meeting request
 type ScheduleRequest struct {
 	ChannelID       string   `json:"channel_id"`
@@ -327,6 +345,28 @@ func (p *Plugin) sendWebhook(webhookURL string, payload map[string]interface{}) 
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
+		// Try to parse structured n8n error response
+		if statusVal, ok := webhookData["status"].(string); ok && statusVal == "error" {
+			webhookErr := &WebhookError{
+				StatusCode: resp.StatusCode,
+			}
+			
+			// Extract message
+			if msg, ok := webhookData["message"].(string); ok && msg != "" {
+				webhookErr.Message = msg
+			} else {
+				webhookErr.Message = fmt.Sprintf("Ошибка при создании встречи (статус %d)", resp.StatusCode)
+			}
+			
+			// Extract execution_id
+			if execID, ok := webhookData["execution_id"].(string); ok && execID != "" {
+				webhookErr.ExecutionID = execID
+			}
+			
+			return nil, webhookErr
+		}
+		
+		// Fallback to legacy error format
 		errorMsg := fmt.Sprintf("webhook returned error (status %d)", resp.StatusCode)
 		if msg, ok := webhookData["message"].(string); ok && msg != "" {
 			errorMsg = msg
@@ -378,10 +418,10 @@ func (p *Plugin) createPost(channel *model.Channel, currentUser *model.User, par
 
 	// Create message
 	postMessage := fmt.Sprintf("📅 @%s запланировал встречу на %s\n\n", currentUser.Username, scheduledAtFormatted)
-	postMessage += fmt.Sprintf("Участники: %s\n\n", participantsList)
-	postMessage += fmt.Sprintf("Продолжительность: %d минут\n\n", duration)
+	postMessage += fmt.Sprintf("👥 Участники: %s\n\n", participantsList)
+	postMessage += fmt.Sprintf("⏱ Длительность: %d минут\n\n", duration)
 	if roomURL != "" {
-		postMessage += fmt.Sprintf("[Присоединиться к встрече](%s)", roomURL)
+		postMessage += fmt.Sprintf("[🔗 Присоединиться к встрече](%s)", roomURL)
 	}
 
 	post := &model.Post{
