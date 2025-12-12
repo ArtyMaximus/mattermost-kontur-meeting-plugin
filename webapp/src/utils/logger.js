@@ -4,7 +4,14 @@
 const DEBUG = typeof window !== 'undefined' && (window.MEETING_DEBUG === true || window.KONTUR_DEBUG === true);
 
 export const logger = {
+  debug: (...args) => {
+    if (DEBUG) {
+      console.debug('[Meeting]', ...args);
+    }
+  },
+  
   log: (...args) => {
+    // Alias for debug, kept for backward compatibility
     if (DEBUG) {
       console.log('[Meeting]', ...args);
     }
@@ -21,6 +28,8 @@ export const logger = {
   },
   
   info: (...args) => {
+    // Info logs are only for critical business events
+    // Use debug() for technical details
     if (DEBUG) {
       console.info('[Meeting]', ...args);
     }

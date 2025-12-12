@@ -14,15 +14,13 @@ func (p *Plugin) getUserSafely(userID string) (*model.User, error) {
 		return nil, fmt.Errorf("user ID is empty")
 	}
 
-	// TODO: Consider moving to LogDebug for production - successful API calls create log noise
-	p.API.LogInfo("[Kontur] Getting user", "user_id", userID)
+	p.API.LogDebug("[Kontur] Getting user", "user_id", userID)
 	user, appErr := p.API.GetUser(userID)
 
 	// In Mattermost API, GetUser can return both error and user
 	// If user is retrieved, continue even if there's an error
 	if user != nil {
-		// TODO: Consider moving to LogDebug for production - successful API calls create log noise
-		p.API.LogInfo("[Kontur] User obtained successfully", 
+		p.API.LogDebug("[Kontur] User obtained successfully", 
 			"user_id", userID,
 			"username", user.Username)
 		return user, nil
@@ -53,8 +51,7 @@ func (p *Plugin) getChannelSafely(channelID string) (*model.Channel, error) {
 		return nil, fmt.Errorf("channel ID is empty")
 	}
 
-	// TODO: Consider moving to LogDebug for production - successful API calls create log noise
-	p.API.LogInfo("[Kontur] Getting channel", "channel_id", channelID)
+	p.API.LogDebug("[Kontur] Getting channel", "channel_id", channelID)
 	channel, appErr := p.API.GetChannel(channelID)
 
 	// In Mattermost API, GetChannel can return both error and channel
@@ -64,8 +61,7 @@ func (p *Plugin) getChannelSafely(channelID string) (*model.Channel, error) {
 		if channelName == "" {
 			channelName = "<unnamed>"
 		}
-		// TODO: Consider moving to LogDebug for production - successful API calls create log noise
-		p.API.LogInfo("[Kontur] Channel obtained successfully", 
+		p.API.LogDebug("[Kontur] Channel obtained successfully", 
 			"channel_id", channelID,
 			"channel_name", channelName)
 		return channel, nil

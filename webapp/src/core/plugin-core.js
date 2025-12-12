@@ -60,7 +60,7 @@ export class PluginCore {
         this.config.ServiceName = '';
       }
       
-      logger.log('Конфигурация получена от сервера', this.config);
+      logger.debug('Конфигурация получена от сервера', this.config);
       return this.config;
     } catch (error) {
       logger.error('Ошибка загрузки конфигурации', error);
@@ -141,7 +141,7 @@ export class PluginCore {
       message: message
     };
 
-    logger.log('Создание сообщения в канале', postPayload);
+    logger.debug('Создание сообщения в канале', postPayload);
 
     const postResponse = await fetch('/api/v4/posts', {
       method: 'POST',
@@ -158,7 +158,7 @@ export class PluginCore {
     }
 
     const postData = await postResponse.json();
-    logger.log('Сообщение опубликовано успешно', postData);
+    logger.debug('Сообщение опубликовано успешно', postData);
     return postData;
   }
 
@@ -171,7 +171,7 @@ export class PluginCore {
     // Use Mattermost notification system if available
     if (this.registry && this.registry.registerPostTypeComponent) {
       // Mattermost notification API would go here
-      logger.log('Notification:', message, type);
+      logger.debug('Notification:', message, type);
     } else {
       // Fallback to alert
       alert(message);

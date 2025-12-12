@@ -322,7 +322,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     try {
       const requestBody = buildScheduleRequest();
 
-      logger.log('Отправка запроса на создание встречи:', requestBody);
+      logger.debug('Отправка запроса на создание встречи:', requestBody);
 
       const response = await fetch('/plugins/com.skyeng.kontur-meeting/api/schedule-meeting', {
         method: 'POST',
@@ -345,7 +345,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       }
 
       // Success
-      logger.log('Meeting scheduled successfully');
+      logger.debug('Meeting scheduled successfully');
       
       resetForm();
       

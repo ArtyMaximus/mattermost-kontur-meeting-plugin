@@ -121,8 +121,7 @@ func (p *Plugin) parseDateTime(req *ScheduleRequest) (time.Time, error) {
 		for _, format := range formats {
 			scheduledAt, err = time.Parse(format, req.StartAtLocal)
 			if err == nil {
-				// TODO: Consider moving to LogDebug for production
-				p.API.LogInfo("[Kontur] Parsed start_at_local", "input", req.StartAtLocal, "format", format)
+				p.API.LogDebug("[Kontur] Parsed start_at_local", "input", req.StartAtLocal, "format", format)
 				break
 			}
 		}
@@ -142,8 +141,7 @@ func (p *Plugin) parseDateTime(req *ScheduleRequest) (time.Time, error) {
 		for _, format := range formats {
 			scheduledAt, err = time.Parse(format, req.StartAt)
 			if err == nil {
-				// TODO: Consider moving to LogDebug for production
-				p.API.LogInfo("[Kontur] Parsed start_at", "input", req.StartAt, "format", format)
+				p.API.LogDebug("[Kontur] Parsed start_at", "input", req.StartAt, "format", format)
 				break
 			}
 		}
@@ -192,8 +190,7 @@ func (p *Plugin) resolveParticipants(req *ScheduleRequest, channel *model.Channe
 	if channel.Type == model.ChannelTypeDirect {
 		otherUserId := channel.GetOtherUserIdForDM(req.UserID)
 		if otherUserId != "" {
-			// TODO: Consider moving to LogDebug for production
-			p.API.LogInfo("[Kontur] DM channel, auto-adding other user", "other_user_id", otherUserId)
+			p.API.LogDebug("[Kontur] DM channel, auto-adding other user", "other_user_id", otherUserId)
 			if len(req.ParticipantIDs) == 0 {
 				req.ParticipantIDs = []string{otherUserId}
 			} else {
@@ -232,8 +229,7 @@ func (p *Plugin) resolveParticipants(req *ScheduleRequest, channel *model.Channe
 		return nil, fmt.Errorf("не удалось получить информацию об участниках")
 	}
 
-	// TODO: Consider moving to LogDebug for production
-	p.API.LogInfo("[Kontur] Participants loaded", "count", len(participants))
+	p.API.LogDebug("[Kontur] Participants loaded", "count", len(participants))
 	return participants, nil
 }
 
@@ -298,8 +294,7 @@ func (p *Plugin) sendWebhook(webhookURL string, payload map[string]interface{}) 
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	// TODO: Consider moving to LogDebug for production - or at least don't log payload size
-	p.API.LogInfo("[Kontur] Sending webhook", "url", webhookURL, "payload_size", len(payloadJSON))
+	p.API.LogDebug("[Kontur] Sending webhook", "url", webhookURL, "payload_size", len(payloadJSON))
 
 	// Create HTTP client with timeout
 	client := &http.Client{
@@ -318,8 +313,7 @@ func (p *Plugin) sendWebhook(webhookURL string, payload map[string]interface{}) 
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	// TODO: Consider moving to LogDebug for production
-	p.API.LogInfo("[Kontur] Webhook response", "status", resp.StatusCode, "body", string(bodyBytes))
+	p.API.LogDebug("[Kontur] Webhook response", "status", resp.StatusCode, "body", string(bodyBytes))
 
 	// Parse response
 	var webhookData map[string]interface{}
@@ -401,8 +395,7 @@ func (p *Plugin) createPost(channel *model.Channel, currentUser *model.User, par
 		return err
 	}
 
-	// TODO: Consider moving to LogDebug for production
-	p.API.LogInfo("[Kontur] Post created successfully")
+	p.API.LogDebug("[Kontur] Post created successfully")
 	return nil
 }
 

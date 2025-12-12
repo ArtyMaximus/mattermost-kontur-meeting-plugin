@@ -35,7 +35,7 @@ class KonturMeetingPlugin {
    * @param {Object} store - Redux store
    */
   async initialize(registry, store) {
-    logger.log('Инициализация плагина...');
+    logger.debug('Инициализация плагина...');
     
     // Initialize core
     this.core.initialize(registry, store);
@@ -43,7 +43,7 @@ class KonturMeetingPlugin {
     // Load plugin configuration
     try {
       await this.core.loadConfig();
-      logger.log('Конфигурация загружена', this.core.config);
+      logger.debug('Конфигурация загружена', this.core.config);
     } catch (error) {
       logger.error('Ошибка загрузки конфигурации', error);
     }
@@ -78,7 +78,7 @@ class KonturMeetingPlugin {
       'kontur-meeting-button'
     );
 
-    logger.log('Плагин инициализирован успешно');
+    logger.debug('Плагин инициализирован успешно');
   }
 
   /**

@@ -23,7 +23,6 @@ type Configuration struct {
 
 // OnActivate is called when the plugin is activated
 func (p *Plugin) OnActivate() error {
-	// TODO: Consider moving to LogDebug for production
 	p.API.LogInfo("Kontur.Talk Meeting plugin activated")
 	
 	// Check that configuration is valid
@@ -31,8 +30,7 @@ func (p *Plugin) OnActivate() error {
 	if config.WebhookURL == "" {
 		p.API.LogWarn("WebhookURL is not configured")
 	} else {
-		// TODO: Consider moving to LogDebug for production
-		p.API.LogInfo("Plugin configured", "webhook_url", config.WebhookURL)
+		p.API.LogDebug("Plugin configured", "webhook_url", config.WebhookURL)
 	}
 	
 	return nil
@@ -40,7 +38,6 @@ func (p *Plugin) OnActivate() error {
 
 // OnDeactivate is called when the plugin is deactivated
 func (p *Plugin) OnDeactivate() error {
-	// TODO: Consider moving to LogDebug for production
 	p.API.LogInfo("Kontur.Talk Meeting plugin deactivated")
 	return nil
 }
@@ -49,8 +46,7 @@ func (p *Plugin) OnDeactivate() error {
 func (p *Plugin) OnConfigurationChange() error {
 	// Clear configuration cache so it will be reloaded on next request
 	p.configuration = nil
-	// TODO: Consider moving to LogDebug for production
-	p.API.LogInfo("Configuration cache cleared")
+	p.API.LogDebug("Configuration cache cleared")
 	return nil
 }
 
@@ -139,8 +135,7 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Consider moving to LogDebug for production
-	p.API.LogInfo("[Kontur] schedule-meeting called")
+	p.API.LogDebug("[Kontur] schedule-meeting called")
 
 	// Only allow POST requests
 	if r.Method != http.MethodPost {
@@ -225,7 +220,6 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Step 9: Return success response
-	// TODO: Consider moving to LogDebug for production - only business-critical logs should stay at Info
 	p.API.LogInfo("[Kontur] Meeting scheduled successfully", "room_url", roomURL)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

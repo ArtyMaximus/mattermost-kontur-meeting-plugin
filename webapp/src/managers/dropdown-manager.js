@@ -35,7 +35,7 @@ export class DropdownManager {
    * @param {Object} channelMember - Channel member object
    */
   openDropdown(channel, channelMember) {
-    logger.log('Opening dropdown menu for channel:', channel.id);
+    logger.debug('Opening dropdown menu for channel:', channel.id);
     this.dropdownChannel = channel;
     this.isDropdownOpen = true;
     this.renderDropdown();
@@ -45,7 +45,7 @@ export class DropdownManager {
    * Close dropdown menu
    */
   closeDropdown() {
-    logger.log('Closing dropdown menu');
+    logger.debug('Closing dropdown menu');
     this.isDropdownOpen = false;
     this.dropdownChannel = null;
     this.renderDropdown();

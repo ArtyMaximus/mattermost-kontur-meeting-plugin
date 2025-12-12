@@ -24,7 +24,7 @@ export class ModalManager {
    * @param {Object} channel - Current channel object
    */
   openScheduleModal(channel) {
-    logger.log('Открытие модального окна планирования встречи:', {
+    logger.debug('Открытие модального окна планирования встречи:', {
       channel: channel.display_name || channel.name,
       channelId: channel.id,
       channelType: channel.type
@@ -75,11 +75,11 @@ export class ModalManager {
         createElementWithProps(ScheduleMeetingModal, {
           channel: this.currentChannel,
           onClose: () => {
-            logger.log('Модальное окно закрыто - вызов closeScheduleModal');
+            logger.debug('Модальное окно закрыто - вызов closeScheduleModal');
             this.closeScheduleModal();
           },
           onSuccess: () => {
-            logger.log('Meeting scheduled successfully - вызов closeScheduleModal');
+            logger.debug('Meeting scheduled successfully - вызов closeScheduleModal');
             this.closeScheduleModal();
           }
         }),

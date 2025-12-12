@@ -81,7 +81,6 @@ mattermost-kontur-meeting-plugin/
 │   │   ├── components/
 │   │   │   ├── schedule_meeting_modal.jsx    # Основная модалка планирования
 │   │   │   ├── modal_components.jsx         # Переиспользуемые компоненты формы
-│   │   │   ├── kontur_meeting_dropdown.jsx  # Выпадающее меню (не используется)
 │   │   │   └── kontur_icon.jsx              # SVG-компонент иконки
 │   │   └── utils/
 │   │       ├── helpers.js         # Форматирование ошибок, информация о пользователе

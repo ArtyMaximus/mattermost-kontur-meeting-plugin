@@ -13,7 +13,7 @@ import { formatErrorMessage } from '../utils/helpers.js';
  * @returns {Promise<void>}
  */
 export async function handleInstantCall(channel, pluginCore) {
-  logger.log('Создание мгновенной встречи:', {
+  logger.debug('Создание мгновенной встречи:', {
     channel: channel.display_name || channel.name,
     channelId: channel.id,
     channelType: channel.type
@@ -39,7 +39,7 @@ export async function handleInstantCall(channel, pluginCore) {
       return;
     }
 
-    logger.log('Текущий пользователь:', {
+    logger.debug('Текущий пользователь:', {
       id: currentUser.id,
       username: currentUser.username,
       email: currentUser.email || '(не указан)'
@@ -57,9 +57,9 @@ export async function handleInstantCall(channel, pluginCore) {
       timestamp: new Date().toISOString()
     };
 
-    logger.log('Создание быстрого созвона (instant_call)');
-    logger.log('Отправка запроса к вебхуку:', webhookURL);
-    logger.log('Payload:', JSON.stringify(webhookPayload, null, 2));
+    logger.debug('Создание быстрого созвона (instant_call)');
+    logger.debug('Отправка запроса к вебхуку:', webhookURL);
+    logger.debug('Payload:', JSON.stringify(webhookPayload, null, 2));
 
     // Send request to webhook to create meeting
     const webhookResponse = await fetch(webhookURL, {
@@ -75,7 +75,7 @@ export async function handleInstantCall(channel, pluginCore) {
     }
 
     const webhookData = await webhookResponse.json();
-    logger.log('Ответ от вебхука:', webhookData);
+    logger.debug('Ответ от вебхука:', webhookData);
 
     // Check if meeting_url or room_url is present in response
     const roomUrl = webhookData.meeting_url || webhookData.room_url;
@@ -99,7 +99,7 @@ export async function handleInstantCall(channel, pluginCore) {
     // Open meeting room in new tab (default: true)
     const openInNewTab = pluginCore.shouldOpenInNewTab();
     if (openInNewTab) {
-      logger.log('Открытие встречи в новой вкладке');
+      logger.debug('Открытие встречи в новой вкладке');
       window.open(roomUrl, '_blank');
     }
 
