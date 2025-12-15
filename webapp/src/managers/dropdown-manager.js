@@ -178,11 +178,12 @@ export class DropdownManager {
           position: 'fixed',
           top: '60px',
           right: '16px',
+          left: 'auto',
           background: 'var(--center-channel-bg, #fff)',
           border: '1px solid var(--center-channel-color-16, rgba(0,0,0,0.1))',
           borderRadius: '4px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          zIndex: 10000,
+          zIndex: 9999,
           minWidth: '200px',
           padding: '4px 0'
         };
@@ -192,45 +193,25 @@ export class DropdownManager {
       const buttonRect = button.getBoundingClientRect();
 
       // Calculate dropdown position relative to button
-      // Dropdown height is approximately 200px (3 menu items + padding + dividers)
-      const dropdownHeight = 200;
+      // Always open dropdown below the button, aligned to the right edge of the button
       const spacing = 4; // spacing between button and dropdown
-      
-      const spaceBelow = window.innerHeight - buttonRect.bottom;
-      const spaceAbove = buttonRect.top;
       
       let dropdownStyle = {
         position: 'fixed',
-        right: '16px',
+        // Horizontal positioning - align to the RIGHT edge of the button
+        right: `${window.innerWidth - buttonRect.right}px`,
+        left: 'auto',
+        // Vertical positioning - always below the button with 4px spacing
+        top: `${buttonRect.bottom + spacing}px`,
+        bottom: 'auto',
         background: 'var(--center-channel-bg, #fff)',
         border: '1px solid var(--center-channel-color-16, rgba(0,0,0,0.1))',
         borderRadius: '4px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        zIndex: 10000,
+        zIndex: 9999,
         minWidth: '200px',
         padding: '4px 0'
       };
-
-      if (spaceBelow >= dropdownHeight) {
-        // Enough space below — open downward
-        dropdownStyle.top = `${buttonRect.bottom + spacing}px`;
-        dropdownStyle.bottom = 'auto';
-      } else if (spaceAbove >= dropdownHeight) {
-        // Not enough space below, but enough above — open upward
-        dropdownStyle.top = `${buttonRect.top - dropdownHeight - spacing}px`;
-        dropdownStyle.bottom = 'auto';
-      } else {
-        // Not enough space in either direction — prefer downward, but adjust if needed
-        if (spaceBelow >= spaceAbove) {
-          // More space below — open downward (may be partially off-screen)
-          dropdownStyle.top = `${buttonRect.bottom + spacing}px`;
-          dropdownStyle.bottom = 'auto';
-        } else {
-          // More space above — open upward (may be partially off-screen)
-          dropdownStyle.top = `${buttonRect.top - dropdownHeight - spacing}px`;
-          dropdownStyle.bottom = 'auto';
-        }
-      }
 
       return createElementWithProps(
         'div',
