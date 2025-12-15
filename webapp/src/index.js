@@ -9,6 +9,7 @@ import { PluginCore } from './core/plugin-core.js';
 import { DropdownManager } from './managers/dropdown-manager.js';
 import { ModalManager } from './managers/modal-manager.js';
 import { handleInstantCall } from './handlers/instant-call-handler.js';
+import './styles.css';
 
 /**
  * Main plugin class - orchestrates all managers and handlers

@@ -41,6 +41,13 @@ export class DropdownManager {
     logger.debug('Opening dropdown menu for channel:', channel.id);
     this.dropdownChannel = channel;
     this.isDropdownOpen = true;
+    
+    // При открытии dropdown - добавить класс для анимации
+    const icon = document.getElementById('kontur-meeting-button-icon');
+    if (icon) {
+      icon.classList.add('dropdown-open');
+    }
+    
     this.renderDropdown();
   }
 
@@ -51,6 +58,13 @@ export class DropdownManager {
     logger.debug('Closing dropdown menu');
     this.isDropdownOpen = false;
     this.dropdownChannel = null;
+    
+    // При закрытии dropdown - удалить класс для анимации
+    const icon = document.getElementById('kontur-meeting-button-icon');
+    if (icon) {
+      icon.classList.remove('dropdown-open');
+    }
+    
     this.renderDropdown();
   }
 
