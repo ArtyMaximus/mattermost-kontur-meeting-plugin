@@ -14,6 +14,77 @@
 - **Удобный интерфейс**: React-модалка для планирования с пресетами времени и поиском участников
 - **Информация о плагине**: Модальное окно с информацией об авторе и контактах
 
+## Использование
+
+### Для конечных пользователей
+
+#### Мгновенная встреча
+
+1. Откройте любой канал (публичный, приватный или личное сообщение)
+2. Нажмите на иконку видеокамеры 📹 в заголовке канала
+3. Выберите **"Созвониться сейчас"**
+4. Встреча создаётся и в канале появляется пост со ссылкой на встречу
+5. Встреча открывается в новой вкладке (если настроено)
+
+#### Запланированная встреча
+
+1. Нажмите на иконку видеокамеры 📹 в заголовке канала
+2. Выберите **"Запланировать встречу"**
+3. Заполните форму:
+   - **Дата и время**: Выберите дату и время (или используйте пресеты: 15 мин, 30 мин, 1 час, 2 часа)
+   - **Продолжительность**: Выберите от 15 минут до 4 часов
+   - **Название**: Опциональное название встречи (максимум 100 символов)
+   - **Участники**: Найдите и добавьте участников (автоматически добавляются для личных сообщений)
+   - **Уведомить участников**: Опционально — отправка уведомлений участникам о запланированной встрече (обрабатывается в n8n)
+   - **Создать событие в Google Calendar**: Опционально — автоматическое создание события в Google Calendar для всех участников (обрабатывается в n8n)
+4. Нажмите **"Создать встречу"**
+5. В канале появляется пост с деталями встречи
+
+#### Информация о плагине
+
+1. Нажмите на иконку видеокамеры 📹 в заголовке канала
+2. Выберите **"О плагине"**
+3. Откроется модальное окно с информацией об авторе и контактах для поддержки
+
+**Примечание**: Настройка пользователем не требуется. Webhook URL настраивается один раз администратором.
+
+## Скриншоты
+
+> ⚙️ **Важно:** Функциональность по созданию встречи, отправке сообщений в ЛС и созданию событий в Google Calendar полностью настраивается через воркфлоу в n8n. Плагин предоставляет только интерфейсную точку входа. Вы можете настроить интеграцию с любым сервисом видеосвязи или любое другое поведение через воркфлоу.
+
+### 1. Панель плагина
+
+![Панель плагина](https://private-user-images.githubusercontent.com/68598437/526710196-ac0ddba4-134e-426d-b8d9-623b331daaf6.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4MjQwNTIsIm5iZiI6MTc2NTgyMzc1MiwicGF0aCI6Ii82ODU5ODQzNy81MjY3MTAxOTYtYWMwZGRiYTQtMTM0ZS00MjZkLWI4ZDktNjIzYjMzMWRhYWY2LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE1VDE4MzU1MlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTMxN2EzNGVkNjBhMzk4MWNhZmQxNjJmNzBiNGVmOGUyMDIxNjAzMTI3MDNmNTBiYjAzYzg0MzEyYjcxMjZhODAmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.V6Wr5G-1HotgaJC_x1XenbbH7tAAiZS39KPEyUnIHEw)
+
+### 2. Дропдаун с опциями
+
+![Дропдаун с опциями](https://private-user-images.githubusercontent.com/68598437/526710355-04001ad9-5a44-469e-bb7a-e47c8b7c0d50.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4MjQwNTIsIm5iZiI6MTc2NTgyMzc1MiwicGF0aCI6Ii82ODU5ODQzNy81MjY3MTAzNTUtMDQwMDFhZDktNWE0NC00NjllLWJiN2EtZTQ3YzhiN2MwZDUwLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE1VDE4MzU1MlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWUyMjFkZmJlM2FmMTMyNWIxNmE3MmNmNTliOWY1NzM4NmZkODg0Y2IwMTIzMTc0ODU3Yjg1OTBjN2FmY2ZjOGMmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.xhcphVZhFwjYhmitZvv9rlwhkEjOr-s5CEpBMFXQozM)
+
+### 3. Сообщение при нажатии "Созвониться сейчас"
+
+![Сообщение при нажатии "Созвониться сейчас"](https://private-user-images.githubusercontent.com/68598437/526712268-12e4f427-b5f7-495f-9ca4-4f055ac00772.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4MjQwNTEsIm5iZiI6MTc2NTgyMzc1MSwicGF0aCI6Ii82ODU5ODQzNy81MjY3MTIyNjgtMTJlNGY0MjctYjVmNy00OTVmLTljYTQtNGYwNTVhYzAwNzcyLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE1VDE4MzU1MVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTk2YjJkN2E2ZDI5MmZjMWM1NmNkNTg2NTQ5ZWE0YjcyNDQ2OTQ3NjM5ZTk0NTlkOWViZjM2M2JhZWUxNDk2MjImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.2_Mh3fcI5CFrhad2jw1pXKYkN62NPk0_nZxQuhdVWjc)
+
+### 4. Модальное окно с формой при выборе "Запланировать встречу"
+
+![Модальное окно с формой](https://private-user-images.githubusercontent.com/68598437/526710600-aca448d8-6807-4876-898b-1a87e61199a6.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4MjQwNTEsIm5iZiI6MTc2NTgyMzc1MSwicGF0aCI6Ii82ODU5ODQzNy81MjY3MTA2MDAtYWNhNDQ4ZDgtNjgwNy00ODc2LTg5OGItMWE4N2U2MTE5OWE2LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE1VDE4MzU1MVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWM5M2U5MjE3ZTQ1MzFmNTllM2E0NWJmOGM0OGM1NzcxNGQ0OGY2ZjlhZTRhMDU2ZDE3MDhhYjEyYzVlM2E0NjEmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.u996Q62b_gO6ZTHodg42H1z9nHDAn4kPlo_IIr_k0EQ)
+
+### 5. Сообщение после планирования встречи
+
+![Сообщение после планирования встречи](https://private-user-images.githubusercontent.com/68598437/526711298-9c36932f-ef27-46a3-a2da-38cae5d27386.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4MjQxMzcsIm5iZiI6MTc2NTgyMzgzNywicGF0aCI6Ii82ODU5ODQzNy81MjY3MTEyOTgtOWMzNjkzMmYtZWYyNy00NmEzLWEyZGEtMzhjYWU1ZDI3Mzg2LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE1VDE4MzcxN1omWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTFmODRmZjNlNDc3NWU1NzZlZDZkNjAyOTk2MDA5OWE3MTFjMjgwNjhhOGMyYTNiZGRjZmIwZTY0ZTBjOGM0YzUmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.YdSkw75HQ0BXO-G7cxtvcoES8CBBWcO6JeCNv1dTkOw)
+
+### 6. Уведомление в ЛС от бота о запланированной встрече
+
+![Уведомление в ЛС от бота](https://private-user-images.githubusercontent.com/68598437/526711475-27f8b313-06cd-4e9f-97ca-7316a8240a6d.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4MjQxNjQsIm5iZiI6MTc2NTgyMzg2NCwicGF0aCI6Ii82ODU5ODQzNy81MjY3MTE0NzUtMjdmOGIzMTMtMDZjZC00ZTlmLTk3Y2EtNzMxNmE4MjQwYTZkLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE1VDE4MzcxNlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTVhNGZkMTZmZTJiMDA5Y2QyZjlkYTliY2FkNTVmMDQ3ZGMwMTQ5NDk1ZTRiZGE5ODU4NDYxMWU2YTI2NDcyNDcmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.odDZpDbU3HdjkM8YNCQIlJrZjUWnVCJO9rWlGVrwVyI)
+
+### 7. Событие в Google Calendar
+
+![Событие в Google Calendar](https://private-user-images.githubusercontent.com/68598437/526711800-bbb1d658-efa0-4c2f-a237-7e2b90714046.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4MjQwNTEsIm5iZiI6MTc2NTgyMzc1MSwicGF0aCI6Ii82ODU5ODQzNy81MjY3MTE4MDAtYmJiMWQ2NTgtZWZhMC00YzJmLWEyMzctN2UyYjkwNzE0MDQ2LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE1VDE4MzU1MVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTlkODE1YmIwMGU5ZmZhMjNiNTdhYzM5OTBlZDI1ZjY4ZGNjN2EwYzBiMTc2NGNiNDg2NzY5NmNjODI1ZWFjNmImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.6s4t_mJenFx81dcuWA0GXEkEPPbrwQQ6fipEDqVM9SU)
+
+### 8. Настройка в панели администратора
+
+![Настройка в панели администратора](https://private-user-images.githubusercontent.com/68598437/526715225-a6c49cff-8ee5-4dee-9d72-5e3ecb8b01c9.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4MjQzNTcsIm5iZiI6MTc2NTgyNDA1NywicGF0aCI6Ii82ODU5ODQzNy81MjY3MTUyMjUtYTZjNDljZmYtOGVlNS00ZGVlLTlkNzItNWUzZWNiOGIwMWM5LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE1VDE4NDA1N1omWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTE5YzUzMWI2OTMyZTEwMDQ5ZmRhMzI4M2M4MmIyYjgyZTU1OGMwNzhkMWFkZjFjMjVkMDY4NWU4OTQxMmJjYzgmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.xzyyWGThcZim2ua69uHBp8iZ404375CQ2lbqMDOymsk)
+
+
 ## Архитектура
 
 ### Backend (Go)
@@ -74,6 +145,13 @@
 - **Мгновенные встречи** (`operation_type: "instant_call"`): Простой запрос с данными канала и пользователя
 - **Запланированные встречи** (`operation_type: "scheduled_meeting"`): Расширенный запрос с датой, временем, участниками и другими параметрами
 
+**Флаги для запланированных встреч:**
+При создании запланированной встречи плагин отправляет на webhook два флага, которые обрабатываются в n8n:
+- **`notify_participants`** (boolean): Флаг уведомления участников. Если `true`, webhook должен отправить уведомления участникам о запланированной встрече (например, через личные сообщения в Mattermost или другие каналы связи).
+- **`create_google_calendar_event`** (boolean): Флаг создания события в Google Calendar. Если `true`, webhook должен создать событие в Google Calendar для всех участников встречи.
+
+> ⚠️ **Важно:** Обработка этих флагов (отправка уведомлений и создание событий в календаре) полностью настраивается в workflow n8n. Плагин только передаёт значения этих флагов, выбранные пользователем в интерфейсе.
+
 Обработка ошибок включает структурированные ответы от n8n с полями `status`, `message` и `execution_id` для отладки.
 
 Подробные требования к API см. в [WEBHOOK_API.md](WEBHOOK_API.md).
@@ -127,7 +205,7 @@ mattermost-kontur-meeting-plugin/
 ├── README.md                       # Этот файл
 ├── WEBHOOK_API.md                  # Документация Webhook API
 ├── QUICKSTART.md                   # Руководство по быстрому старту
-└── n8n-workflow-example.json      # Пример workflow n8n
+
 
 ```
 
@@ -222,38 +300,6 @@ tar -czf kontur-meeting.tar.gz plugin.json webapp/dist/ server/dist/ assets/
 
 3. Нажмите **Save**
 4. Перезагрузите страницу Mattermost (Ctrl+R или F5)
-
-## Использование
-
-### Для конечных пользователей
-
-#### Мгновенная встреча
-
-1. Откройте любой канал (публичный, приватный или личное сообщение)
-2. Нажмите на иконку видеокамеры 📹 в заголовке канала
-3. Выберите **"Созвониться сейчас"**
-4. Встреча создаётся и в канале появляется пост со ссылкой на встречу
-5. Встреча открывается в новой вкладке (если настроено)
-
-#### Запланированная встреча
-
-1. Нажмите на иконку видеокамеры 📹 в заголовке канала
-2. Выберите **"Запланировать встречу"**
-3. Заполните форму:
-   - **Дата и время**: Выберите дату и время (или используйте пресеты: 15 мин, 30 мин, 1 час, 2 часа)
-   - **Продолжительность**: Выберите от 15 минут до 4 часов
-   - **Название**: Опциональное название встречи (максимум 100 символов)
-   - **Участники**: Найдите и добавьте участников (автоматически добавляются для личных сообщений)
-4. Нажмите **"Создать встречу"**
-5. В канале появляется пост с деталями встречи
-
-#### Информация о плагине
-
-1. Нажмите на иконку видеокамеры 📹 в заголовке канала
-2. Выберите **"О плагине"**
-3. Откроется модальное окно с информацией об авторе и контактах для поддержки
-
-**Примечание**: Настройка пользователем не требуется. Webhook URL настраивается один раз администратором.
 
 ## Разработка
 
@@ -415,7 +461,5 @@ window.KONTUR_DEBUG = true;
 MIT
 
 ## Поддержка
-
-- **Issues**: https://github.com/skyeng/mattermost-kontur-meeting-plugin/issues
 - **Документация плагинов Mattermost**: https://developers.mattermost.com/integrate/plugins/
-- **Руководство по быстрому старту**: См. [QUICKSTART.md](QUICKSTART.md)
+
