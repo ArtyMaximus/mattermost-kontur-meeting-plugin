@@ -70,12 +70,16 @@ class KonturMeetingPlugin {
 
     // Register channel header button - opens React dropdown component
     const serviceName = this.core.getServiceName();
+    // Use serviceName in tooltip but keep "Kontur Meeting Plugin" prefix for reliable button search
+    const tooltipText = serviceName 
+      ? `Kontur Meeting Plugin - ${serviceName}` 
+      : 'Kontur Meeting Plugin';
     registry.registerChannelHeaderButtonAction(
       icon,
       (channel, channelMember) => {
         this.dropdownManager.openDropdown(channel, channelMember);
       },
-      'Kontur Meeting Plugin',
+      tooltipText,
       'kontur-meeting-button'
     );
 
