@@ -1,0 +1,362 @@
+/* ==========================================
+   АНИМАЦИИ МОДАЛКИ
+   ========================================== */
+
+@keyframes modal-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes backdrop-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+
+@keyframes button-spinner {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes success-check {
+  to { transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes section-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hint-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* ==========================================
+   LAYOUT МОДАЛКИ
+   ========================================== */
+
+.schedule-meeting-modal {
+  animation: modal-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.schedule-meeting-modal-backdrop {
+  backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.6) !important;
+  animation: backdrop-fade-in 0.2s ease-out;
+}
+
+
+/* ==========================================
+   ЗАГОЛОВОК
+   ========================================== */
+
+.schedule-meeting-modal h2,
+.schedule-meeting-modal h3 {
+  position: relative;
+  padding-bottom: 12px;
+}
+
+.schedule-meeting-modal h2::after,
+.schedule-meeting-modal h3::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--button-bg, #166de0), transparent);
+  border-radius: 2px;
+}
+
+
+/* ==========================================
+   СЕКЦИИ ФОРМЫ С ИКОНКАМИ
+   ========================================== */
+
+.schedule-meeting-modal .form-section {
+  margin-bottom: 24px;
+  animation: section-fade-in 0.4s ease backwards;
+}
+
+.schedule-meeting-modal .form-section:nth-child(1) { animation-delay: 0.05s; }
+.schedule-meeting-modal .form-section:nth-child(2) { animation-delay: 0.1s; }
+.schedule-meeting-modal .form-section:nth-child(3) { animation-delay: 0.15s; }
+.schedule-meeting-modal .form-section:nth-child(4) { animation-delay: 0.2s; }
+.schedule-meeting-modal .form-section:nth-child(5) { animation-delay: 0.25s; }
+
+/* Label с иконкой */
+.schedule-meeting-modal .form-section label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.schedule-meeting-modal .form-section label::before {
+  content: '';
+  width: 18px;
+  height: 18px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.7;
+}
+
+/* Иконка календаря для "Дата и время" */
+.schedule-meeting-modal .form-section.date-time label::before {
+  content: '📅';
+  font-size: 18px;
+}
+
+/* Иконка часов для "Продолжительность" */
+.schedule-meeting-modal .form-section.duration label::before {
+  content: '⏰';
+  font-size: 18px;
+}
+
+/* Иконка для "Название встречи" */
+.schedule-meeting-modal .form-section.meeting-name label::before {
+  content: '📹';
+  font-size: 18px;
+}
+
+/* Иконка людей для "Участники" */
+.schedule-meeting-modal .form-section.participants label::before {
+  content: '👥';
+  font-size: 18px;
+}
+
+
+/* ==========================================
+   ПОЛЯ ФОРМЫ
+   ========================================== */
+
+.schedule-meeting-modal input[type="text"],
+.schedule-meeting-modal input[type="date"],
+.schedule-meeting-modal select,
+.schedule-meeting-modal textarea {
+  transition: all 0.2s ease;
+  border: 1px solid rgba(var(--center-channel-color-rgb, 61, 60, 64), 0.16);
+  width: 100%;
+}
+
+.schedule-meeting-modal input:focus,
+.schedule-meeting-modal select:focus,
+.schedule-meeting-modal textarea:focus {
+  border-color: var(--button-bg, #166de0);
+  box-shadow: 0 0 0 3px rgba(var(--button-bg-rgb, 22, 109, 224), 0.1);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.schedule-meeting-modal input:hover,
+.schedule-meeting-modal select:hover,
+.schedule-meeting-modal textarea:hover {
+  border-color: var(--button-bg, #166de0);
+}
+
+
+/* ==========================================
+   КАСТОМНЫЕ СЕЛЕКТЫ
+   ========================================== */
+
+.schedule-meeting-modal select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%233d3c40' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+/* Тёмная тема */
+.theme--dark .schedule-meeting-modal select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+}
+
+
+/* ==========================================
+   БЫСТРЫЙ ВЫБОР ВРЕМЕНИ
+   ========================================== */
+
+.quick-time-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.quick-time-buttons button {
+  position: relative;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(var(--center-channel-color-rgb, 61, 60, 64), 0.24);
+  background: transparent;
+  color: var(--center-channel-color);
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Иконки на кнопках быстрого выбора */
+.quick-time-buttons button::before {
+  font-size: 14px;
+}
+
+.quick-time-buttons button[data-time="15min"]::before {
+  content: '🕐';
+}
+
+.quick-time-buttons button[data-time="30min"]::before {
+  content: '🕜';
+}
+
+.quick-time-buttons button[data-time="1hour"]::before {
+  content: '🕑';
+}
+
+.quick-time-buttons button[data-time="2hours"]::before {
+  content: '🕒';
+}
+
+.quick-time-buttons button:hover {
+  background: rgba(var(--button-bg-rgb, 22, 109, 224), 0.08);
+  border-color: var(--button-bg, #166de0);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.quick-time-buttons button:active {
+  transform: translateY(0);
+}
+
+.quick-time-buttons button.active {
+  background: var(--button-bg, #166de0);
+  color: #fff;
+  border-color: var(--button-bg, #166de0);
+  font-weight: 600;
+}
+
+
+/* ==========================================
+   КНОПКИ ДЕЙСТВИЙ
+   ========================================== */
+
+.schedule-meeting-modal .modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.schedule-meeting-modal .create-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.schedule-meeting-modal .create-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(var(--button-bg-rgb, 22, 109, 224), 0.4);
+}
+
+.schedule-meeting-modal .create-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Loading состояние */
+.schedule-meeting-modal .create-button.loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.schedule-meeting-modal .create-button.loading::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #fff;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: button-spinner 0.6s linear infinite;
+  right: 16px;
+  top: 50%;
+  margin-top: -8px;
+}
+
+/* Success состояние */
+.schedule-meeting-modal .create-button.success {
+  background: #28a745 !important;
+  border-color: #28a745 !important;
+}
+
+.schedule-meeting-modal .create-button.success::before {
+  content: '✓';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  font-size: 20px;
+  color: #fff;
+  animation: success-check 0.4s ease-out forwards;
+}
+
+
+/* ==========================================
+   ВАЛИДАЦИЯ
+   ========================================== */
+
+.schedule-meeting-modal input.error,
+.schedule-meeting-modal select.error,
+.schedule-meeting-modal textarea.error {
+  border-color: #d32f2f !important;
+  animation: shake 0.4s ease;
+}
+
+.schedule-meeting-modal .error-message {
+  color: #d32f2f;
+  font-size: 12px;
+  margin-top: 4px;
+  animation: hint-fade-in 0.3s ease;
+}
+
+
+/* ==========================================
+   ПОДСКАЗКИ
+   ========================================== */
+
+.schedule-meeting-modal .field-hint {
+  font-size: 12px;
+  color: rgba(var(--center-channel-color-rgb, 61, 60, 64), 0.6);
+  margin-top: 4px;
+  animation: hint-fade-in 0.3s ease;
+}
+

@@ -12,6 +12,7 @@ import {
   TimeSelector,
   TimePresets
 } from './modal_components.jsx';
+import './schedule-meeting-modal.css';
 
 const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   // Определяем, является ли канал директом (DM)
@@ -30,6 +31,9 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [selectedQuick, setSelectedQuick] = useState(null);
   
   const modalRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -46,6 +50,9 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     setMeetingTitle(channel.display_name || channel.name || '');
     setParticipants([]);
     setErrors({});
+    setIsLoading(false);
+    setIsSuccess(false);
+    setSelectedQuick(null);
   };
 
   // Закрытие при клике вне модального окна (по фону)
@@ -318,6 +325,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     }
 
     setIsSubmitting(true);
+    setIsLoading(true);
 
     try {
       const requestBody = buildScheduleRequest();
@@ -341,23 +349,29 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
         });
         
         await handleApiError(response);
+        setIsLoading(false);
         return;
       }
 
       // Success
       logger.debug('Meeting scheduled successfully');
       
-      resetForm();
+      setIsLoading(false);
+      setIsSuccess(true);
       
       if (onSuccess) {
         onSuccess();
       }
       
-      onClose();
+      setTimeout(() => {
+        resetForm();
+        onClose();
+      }, 1000);
 
     } catch (error) {
       logger.error('Ошибка при создании встречи:', error);
       
+      setIsLoading(false);
       const config = window.KonturMeetingPlugin && window.KonturMeetingPlugin.config;
       const errorMessage = formatErrorMessage(error, config);
       alert(errorMessage);
@@ -392,6 +406,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
 
   // Обработчики пресетов времени
   const applyTimePreset = (presetType) => {
+    setSelectedQuick(presetType);
     const now = new Date();
     let targetDate = selectedDate;
     let targetHour = '';
@@ -405,9 +420,9 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
         if (!selectedDate) {
           targetDate = new Date(in15Min.getFullYear(), in15Min.getMonth(), in15Min.getDate());
         }
-        // Время всегда берем из "текущее + 15 минут", округленное до 15 минут
+        // Время всегда берем из "текущее + 15 минут", округленное до 5 минут
         targetHour = String(in15Min.getHours()).padStart(2, '0');
-        targetMinute = String(Math.floor(in15Min.getMinutes() / 15) * 15).padStart(2, '0');
+        targetMinute = String(Math.floor(in15Min.getMinutes() / 5) * 5).padStart(2, '0');
         break;
       }
       case '30min': {
@@ -417,7 +432,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
           targetDate = new Date(in30Min.getFullYear(), in30Min.getMonth(), in30Min.getDate());
         }
         targetHour = String(in30Min.getHours()).padStart(2, '0');
-        targetMinute = String(Math.floor(in30Min.getMinutes() / 15) * 15).padStart(2, '0');
+        targetMinute = String(Math.floor(in30Min.getMinutes() / 5) * 5).padStart(2, '0');
         break;
       }
       case '1hour': {
@@ -427,7 +442,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
           targetDate = new Date(in1Hour.getFullYear(), in1Hour.getMonth(), in1Hour.getDate());
         }
         targetHour = String(in1Hour.getHours()).padStart(2, '0');
-        targetMinute = String(Math.floor(in1Hour.getMinutes() / 15) * 15).padStart(2, '0');
+        targetMinute = String(Math.floor(in1Hour.getMinutes() / 5) * 5).padStart(2, '0');
         break;
       }
       case '2hours': {
@@ -437,7 +452,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
           targetDate = new Date(in2Hours.getFullYear(), in2Hours.getMonth(), in2Hours.getDate());
         }
         targetHour = String(in2Hours.getHours()).padStart(2, '0');
-        targetMinute = String(Math.floor(in2Hours.getMinutes() / 15) * 15).padStart(2, '0');
+        targetMinute = String(Math.floor(in2Hours.getMinutes() / 5) * 5).padStart(2, '0');
         break;
       }
       default:
@@ -501,6 +516,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
 
   return (
     <div
+      className="schedule-meeting-modal-backdrop"
       style={{
         position: 'fixed',
         top: 0,
@@ -513,9 +529,11 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
         justifyContent: 'center',
         zIndex: 10000
       }}
+      onClick={onClose}
     >
       <div
         ref={modalRef}
+        className="schedule-meeting-modal"
         style={{
           backgroundColor: 'var(--center-channel-bg, #fff)',
           borderRadius: '8px',
@@ -547,7 +565,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
 
         <form onSubmit={handleSubmit}>
           {/* Дата и время */}
-          <div style={{marginBottom: '20px'}}>
+          <div className="form-section date-time" style={{marginBottom: '20px'}}>
             <label style={{
               display: 'block',
               marginBottom: '8px',
@@ -570,6 +588,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
                 onClick={() => setShowCalendar(!showCalendar)}
                 readOnly
                 placeholder="Выберите дату"
+                className={errors.meetingDatetime ? 'error' : ''}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -634,7 +653,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
                 </div>
               )}
               {errors.meetingDatetime && (
-                <div style={{color: 'red', fontSize: '12px', marginTop: '4px'}}>
+                <div className="error-message">
                   {errors.meetingDatetime}
                 </div>
               )}
@@ -648,18 +667,20 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
               errors={errors}
             />
 
-            <TimePresets applyTimePreset={applyTimePreset} />
+            <TimePresets applyTimePreset={applyTimePreset} selectedQuick={selectedQuick} />
           </div>
 
           {/* Продолжительность */}
-          <DurationSelector 
-            duration={duration}
-            setDuration={setDuration}
-            errors={errors}
-          />
+          <div className="form-section duration">
+            <DurationSelector 
+              duration={duration}
+              setDuration={setDuration}
+              errors={errors}
+            />
+          </div>
 
           {/* Название встречи */}
-          <div style={{marginBottom: '20px'}}>
+          <div className="form-section meeting-name" style={{marginBottom: '20px'}}>
             <label style={{
               display: 'block',
               marginBottom: '8px',
@@ -675,6 +696,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
               onChange={(e) => setMeetingTitle(e.target.value)}
               placeholder="Обсуждение проекта"
               maxLength={100}
+              className={errors.meetingTitle ? 'error' : ''}
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -686,17 +708,18 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
               }}
             />
             {errors.meetingTitle && (
-              <div style={{color: 'red', fontSize: '12px', marginTop: '4px'}}>
+              <div className="error-message">
                 {errors.meetingTitle}
               </div>
             )}
-            <div style={{color: 'var(--center-channel-color-64, #666)', fontSize: '12px', marginTop: '4px'}}>
+            <div className="field-hint">
               Опционально, максимум 100 символов
             </div>
           </div>
 
           {/* Участники */}
-          <ParticipantSelector 
+          <div className="form-section participants">
+            <ParticipantSelector 
             isDirectChannel={isDirectChannel}
             participantSearch={participantSearch}
             setParticipantSearch={setParticipantSearch}
@@ -707,9 +730,10 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
             errors={errors}
             searchInputRef={searchInputRef}
           />
+          </div>
 
           {/* Кнопки */}
-          <div style={{
+          <div className="modal-actions" style={{
             display: 'flex',
             justifyContent: 'flex-end',
             gap: '12px',
@@ -738,19 +762,20 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              className={`create-button ${isLoading ? 'loading' : ''} ${isSuccess ? 'success' : ''}`}
+              disabled={isSubmitting || isLoading || isSuccess}
               style={{
                 padding: '8px 16px',
                 fontSize: '14px',
                 border: 'none',
                 borderRadius: '4px',
-                backgroundColor: isSubmitting ? 'var(--center-channel-color-32, #999)' : 'var(--button-bg, #2389D7)',
+                backgroundColor: isSubmitting || isLoading ? 'var(--center-channel-color-32, #999)' : 'var(--button-bg, #2389D7)',
                 color: 'var(--button-color, #fff)',
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                cursor: (isSubmitting || isLoading || isSuccess) ? 'not-allowed' : 'pointer',
                 fontWeight: '600'
               }}
             >
-              {isSubmitting ? 'Создание...' : 'Создать встречу'}
+              {isSuccess ? '' : (isLoading ? 'Создание...' : 'Создать встречу')}
             </button>
           </div>
         </form>
