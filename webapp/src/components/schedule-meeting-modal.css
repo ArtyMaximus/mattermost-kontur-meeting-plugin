@@ -360,3 +360,180 @@
   animation: hint-fade-in 0.3s ease;
 }
 
+
+/* ==========================================
+   ЧЕКБОКС УВЕДОМЛЕНИЙ
+   ========================================== */
+
+.form-section.notification-checkbox {
+  margin-bottom: 20px;
+}
+
+.form-section.notification-checkbox .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 12px;
+  border: 1px solid rgba(var(--center-channel-color-rgb, 61, 60, 64), 0.16);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  background: transparent;
+  margin-bottom: 0;
+  font-weight: normal;
+}
+
+.form-section.notification-checkbox .checkbox-label:hover {
+  background: rgba(var(--button-bg-rgb, 22, 109, 224), 0.04);
+  border-color: var(--button-bg, #166de0);
+}
+
+/* Кастомный чекбокс */
+.form-section.notification-checkbox input[type="checkbox"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(var(--center-channel-color-rgb, 61, 60, 64), 0.32);
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  background: var(--center-channel-bg, #fff);
+}
+
+.form-section.notification-checkbox input[type="checkbox"]:hover {
+  border-color: var(--button-bg, #166de0);
+}
+
+.form-section.notification-checkbox input[type="checkbox"]:checked {
+  background: var(--button-bg, #166de0);
+  border-color: var(--button-bg, #166de0);
+}
+
+/* Галочка */
+.form-section.notification-checkbox input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 6px;
+  height: 11px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.form-section.notification-checkbox .checkbox-label span {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--center-channel-color);
+}
+
+.form-section.notification-checkbox .checkbox-icon {
+  font-size: 18px;
+  margin-left: -4px;
+}
+
+/* Hint под чекбоксом */
+.form-section.notification-checkbox .field-hint {
+  margin-top: 8px;
+  margin-left: 30px;
+}
+
+/* Анимация при переключении */
+.form-section.notification-checkbox input[type="checkbox"] {
+  animation: checkbox-appear 0.3s ease;
+}
+
+@keyframes checkbox-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+
+/* ==========================================
+   ЧЕКБОКС GOOGLE CALENDAR
+   ========================================== */
+
+.form-section.google-calendar-checkbox {
+  margin-bottom: 20px;
+}
+
+.form-section.google-calendar-checkbox .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 12px;
+  border: 1px solid rgba(var(--center-channel-color-rgb, 61, 60, 64), 0.16);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  background: transparent;
+  margin-bottom: 0;
+  font-weight: normal;
+}
+
+.form-section.google-calendar-checkbox .checkbox-label:hover {
+  background: rgba(var(--button-bg-rgb, 22, 109, 224), 0.04);
+  border-color: var(--button-bg, #166de0);
+}
+
+/* Кастомный чекбокс (такой же как для Time) */
+.form-section.google-calendar-checkbox input[type="checkbox"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(var(--center-channel-color-rgb, 61, 60, 64), 0.32);
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  background: var(--center-channel-bg, #fff);
+}
+
+.form-section.google-calendar-checkbox input[type="checkbox"]:hover {
+  border-color: var(--button-bg, #166de0);
+}
+
+.form-section.google-calendar-checkbox input[type="checkbox"]:checked {
+  background: var(--button-bg, #166de0);
+  border-color: var(--button-bg, #166de0);
+}
+
+/* Галочка */
+.form-section.google-calendar-checkbox input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 6px;
+  height: 11px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Иконка календаря */
+.form-section.google-calendar-checkbox .checkbox-icon {
+  font-size: 18px;
+}
+
+.form-section.google-calendar-checkbox .checkbox-label span:not(.checkbox-icon) {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--center-channel-color);
+}
+
+/* Hint под чекбоксом */
+.form-section.google-calendar-checkbox .field-hint {
+  margin-top: 8px;
+  margin-left: 30px;
+}

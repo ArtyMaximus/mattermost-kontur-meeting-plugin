@@ -34,6 +34,8 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [selectedQuick, setSelectedQuick] = useState(null);
+  const [notifyParticipants, setNotifyParticipants] = useState(true);
+  const [createGoogleEvent, setCreateGoogleEvent] = useState(true);
   
   const modalRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -53,6 +55,8 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     setIsLoading(false);
     setIsSuccess(false);
     setSelectedQuick(null);
+    setNotifyParticipants(true);
+    setCreateGoogleEvent(true);
   };
 
   // Закрытие при клике вне модального окна (по фону)
@@ -254,6 +258,10 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   const buildScheduleRequest = () => {
     const userInfo = getUserInfo();
     const { startAtUTC, startAtLocal } = buildDateTimeStrings(selectedDate, selectedHour, selectedMinute);
+    
+    // Get service name from config
+    const config = window.KonturMeetingPlugin && window.KonturMeetingPlugin.config;
+    const serviceName = config?.ServiceName || '';
 
     return {
       [REQUEST_FIELDS.CHANNEL_ID]: channel.id,
@@ -264,7 +272,10 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       [REQUEST_FIELDS.TIMEZONE]: DEFAULT_TIMEZONE,
       [REQUEST_FIELDS.DURATION_MINUTES]: parseInt(duration, 10),
       [REQUEST_FIELDS.TITLE]: meetingTitle.trim() || null,
-      [REQUEST_FIELDS.PARTICIPANT_IDS]: participants.map(p => p.id)
+      [REQUEST_FIELDS.PARTICIPANT_IDS]: participants.map(p => p.id),
+      notify_participants: notifyParticipants,
+      create_google_calendar_event: createGoogleEvent,
+      service_name: serviceName
     };
   };
 
@@ -730,6 +741,38 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
             errors={errors}
             searchInputRef={searchInputRef}
           />
+          </div>
+
+          {/* Чекбокс уведомлений */}
+          <div className="form-section notification-checkbox">
+            <label className="checkbox-label">
+              <input 
+                type="checkbox" 
+                checked={notifyParticipants}
+                onChange={(e) => setNotifyParticipants(e.target.checked)}
+              />
+              <span className="checkbox-icon">🔔</span>
+              <span>Уведомить участников в Time</span>
+            </label>
+            <div className="field-hint">
+              Участники получат уведомление о запланированной встрече
+            </div>
+          </div>
+
+          {/* Чекбокс Google Calendar */}
+          <div className="form-section google-calendar-checkbox">
+            <label className="checkbox-label">
+              <input 
+                type="checkbox" 
+                checked={createGoogleEvent}
+                onChange={(e) => setCreateGoogleEvent(e.target.checked)}
+              />
+              <span className="checkbox-icon">📅</span>
+              <span>Создать событие в Google Календаре у всех</span>
+            </label>
+            <div className="field-hint">
+              Событие будет автоматически добавлено в Google Calendar всех участников
+            </div>
           </div>
 
           {/* Кнопки */}
