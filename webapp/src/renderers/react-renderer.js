@@ -99,3 +99,4 @@ export function isReactAvailable() {
   return !!(window.React && window.React.createElement && window.ReactDOM);
 }
 
+
