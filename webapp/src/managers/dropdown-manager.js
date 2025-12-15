@@ -135,14 +135,55 @@ export class DropdownManager {
         manager.closeDropdown();
       };
 
-      // Find plugin button position
-      const button = document.querySelector('[data-plugin-id="kontur-meeting-button"]');
-      const buttonRect = button ? button.getBoundingClientRect() : null;
+      // Find plugin button position using multiple fallback strategies
+      // Primary: search by SVG icon ID
+      let button = document.getElementById('kontur-meeting-button-icon')?.closest('button');
+      
+      // Fallback #1: search by aria-label
+      if (!button) {
+        button = document.querySelector('button[aria-label*="Kontur Meeting Plugin"]');
+      }
+      
+      // Fallback #2: search by channel header icon class and viewBox
+      if (!button) {
+        const svg = document.querySelector('.channel-header__icon svg[viewBox="0 0 32 32"]');
+        if (svg) {
+          button = svg.closest('button');
+        }
+      }
+      
+      // Fallback #3: search by data-plugin-id (legacy)
+      if (!button) {
+        button = document.querySelector('[data-plugin-id="kontur-meeting-button"]');
+      }
+
+      if (!button) {
+        logger.error('[Kontur Plugin] Channel header button not found');
+        // Use fallback position
+        const dropdownStyle = {
+          position: 'fixed',
+          top: '60px',
+          right: '16px',
+          background: 'var(--center-channel-bg, #fff)',
+          border: '1px solid var(--center-channel-color-16, rgba(0,0,0,0.1))',
+          borderRadius: '4px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          zIndex: 10000,
+          minWidth: '200px',
+          padding: '4px 0'
+        };
+        return createElementWithProps('div', { ref: dropdownRef, style: dropdownStyle }, []);
+      }
+
+      const buttonRect = button.getBoundingClientRect();
 
       // Calculate dropdown position relative to button
-      // Dropdown height is approximately 180px (3 menu items + padding)
-      const dropdownHeight = 180;
+      // Dropdown height is approximately 200px (3 menu items + padding + dividers)
+      const dropdownHeight = 200;
       const spacing = 4; // spacing between button and dropdown
+      
+      const spaceBelow = window.innerHeight - buttonRect.bottom;
+      const spaceAbove = buttonRect.top;
       
       let dropdownStyle = {
         position: 'fixed',
@@ -156,25 +197,25 @@ export class DropdownManager {
         padding: '4px 0'
       };
 
-      if (buttonRect) {
-        const spaceBelow = window.innerHeight - buttonRect.bottom;
-        const spaceAbove = buttonRect.top;
-        
-        if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
-          // Enough space below or more space below than above — open downward
+      if (spaceBelow >= dropdownHeight) {
+        // Enough space below — open downward
+        dropdownStyle.top = `${buttonRect.bottom + spacing}px`;
+        dropdownStyle.bottom = 'auto';
+      } else if (spaceAbove >= dropdownHeight) {
+        // Not enough space below, but enough above — open upward
+        dropdownStyle.top = `${buttonRect.top - dropdownHeight - spacing}px`;
+        dropdownStyle.bottom = 'auto';
+      } else {
+        // Not enough space in either direction — prefer downward, but adjust if needed
+        if (spaceBelow >= spaceAbove) {
+          // More space below — open downward (may be partially off-screen)
           dropdownStyle.top = `${buttonRect.bottom + spacing}px`;
           dropdownStyle.bottom = 'auto';
         } else {
-          // Not enough space below — open upward
-          // Position dropdown above button: calculate top position to place dropdown above button
+          // More space above — open upward (may be partially off-screen)
           dropdownStyle.top = `${buttonRect.top - dropdownHeight - spacing}px`;
           dropdownStyle.bottom = 'auto';
         }
-      } else {
-        // Fallback if button not found
-        logger.warn('Plugin button not found, using fallback position');
-        dropdownStyle.top = '60px';
-        dropdownStyle.bottom = 'auto';
       }
 
       return createElementWithProps(

@@ -75,7 +75,7 @@ class KonturMeetingPlugin {
       (channel, channelMember) => {
         this.dropdownManager.openDropdown(channel, channelMember);
       },
-      serviceName ? `Создать встречу ${serviceName}` : 'Создать встречу',
+      'Kontur Meeting Plugin',
       'kontur-meeting-button'
     );
 

@@ -8,6 +8,7 @@ import PropTypes from 'prop-types';
 const KonturIcon = ({ size = 20, color = 'currentColor', style = {} }) => {
   return (
     <svg
+      id="kontur-meeting-button-icon"
       width={size}
       height={size}
       viewBox="0 0 32 32"

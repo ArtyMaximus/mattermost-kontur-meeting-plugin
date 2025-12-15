@@ -17,7 +17,7 @@ server:
 	@echo "Building server for $(GOOS)/$(GOARCH)..."
 	cd server && \
 	go mod download && \
-	go build -o dist/plugin-$(GOOS)-$(GOARCH) plugin.go
+	go build -ldflags="-s -w" -o dist/plugin-$(GOOS)-$(GOARCH) plugin.go
 
 ## Build webapp component
 webapp:
