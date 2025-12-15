@@ -31,15 +31,18 @@ func IsWebhookError(err error) (*WebhookError, bool) {
 
 // ScheduleRequest represents the schedule meeting request
 type ScheduleRequest struct {
-	ChannelID       string   `json:"channel_id"`
-	TeamID          string   `json:"team_id"`
-	UserID          string   `json:"user_id"`
-	StartAt         string   `json:"start_at"`
-	StartAtLocal    string   `json:"start_at_local"`
-	Timezone        string   `json:"timezone"`
-	DurationMinutes int      `json:"duration_minutes"`
-	Title           *string  `json:"title"`
-	ParticipantIDs  []string `json:"participant_ids"`
+	ChannelID              string   `json:"channel_id"`
+	TeamID                 string   `json:"team_id"`
+	UserID                 string   `json:"user_id"`
+	StartAt                string   `json:"start_at"`
+	StartAtLocal           string   `json:"start_at_local"`
+	Timezone               string   `json:"timezone"`
+	DurationMinutes        int      `json:"duration_minutes"`
+	Title                  *string  `json:"title"`
+	ParticipantIDs         []string `json:"participant_ids"`
+	NotifyParticipants      bool     `json:"notify_participants"`
+	CreateGoogleCalendarEvent bool   `json:"create_google_calendar_event"`
+	ServiceName            string   `json:"service_name"`
 }
 
 // validateScheduleRequest validates and parses the incoming request
@@ -251,6 +254,16 @@ func (p *Plugin) resolveParticipants(req *ScheduleRequest, channel *model.Channe
 	return participants, nil
 }
 
+// convertToMSK converts UTC time to Moscow timezone (MSK)
+func convertToMSK(utcTime time.Time) string {
+	mskLocation, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		// Fallback to UTC+3 if location loading fails
+		mskLocation = time.FixedZone("MSK", 3*60*60)
+	}
+	return utcTime.In(mskLocation).Format(time.RFC3339)
+}
+
 // buildWebhookPayload creates the webhook payload
 func (p *Plugin) buildWebhookPayload(req *ScheduleRequest, currentUser *model.User, channel *model.Channel, participants []*model.User, scheduledAt time.Time) map[string]interface{} {
 	// Calculate end time
@@ -268,6 +281,15 @@ func (p *Plugin) buildWebhookPayload(req *ScheduleRequest, currentUser *model.Us
 		meetingTitle = *req.Title
 	}
 
+	// Get service name from request or fallback to config
+	serviceName := req.ServiceName
+	if serviceName == "" {
+		config := p.getConfiguration()
+		if config != nil {
+			serviceName = config.ServiceName
+		}
+	}
+
 	// Convert participants to map format
 	participantMaps := make([]map[string]interface{}, len(participants))
 	for i, p := range participants {
@@ -282,10 +304,11 @@ func (p *Plugin) buildWebhookPayload(req *ScheduleRequest, currentUser *model.Us
 
 	payload := map[string]interface{}{
 		"operation_type":     "scheduled_meeting",
-		"scheduled_at":       scheduledAt.Format(time.RFC3339),
-		"scheduled_at_local": req.StartAtLocal,
-		"end_time":           endTime.Format(time.RFC3339),
-		"end_time_local":     "", // Calculated on server if needed
+		"service_name":       serviceName,
+		"start_time_utc":     scheduledAt.UTC().Format(time.RFC3339),
+		"end_time_utc":       endTime.UTC().Format(time.RFC3339),
+		"start_time_msk":     convertToMSK(scheduledAt),
+		"end_time_msk":       convertToMSK(endTime),
 		"timezone":           timezone,
 		"duration_minutes":   req.DurationMinutes,
 		"title":              meetingTitle,
@@ -295,11 +318,13 @@ func (p *Plugin) buildWebhookPayload(req *ScheduleRequest, currentUser *model.Us
 		"channel_type":       string(channel.Type),
 		"user_id":            currentUser.Id,
 		"username":           currentUser.Username,
-		"user_email":         currentUser.Email,
-		"participants":       participantMaps,
-		"auto_detected":      false,
-		"source":             "user_selection",
-		"timestamp":          time.Now().Format(time.RFC3339),
+		"user_email":                currentUser.Email,
+		"participants":              participantMaps,
+		"notify_participants":        req.NotifyParticipants,
+		"create_google_calendar_event": req.CreateGoogleCalendarEvent,
+		"auto_detected":              false,
+		"source":                     "user_selection",
+		"timestamp":                  time.Now().Format(time.RFC3339),
 	}
 
 	return payload

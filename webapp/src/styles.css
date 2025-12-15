@@ -1,0 +1,42 @@
+/* ==========================================
+   Анимация для кнопки Kontur Meeting Plugin
+   ========================================== */
+
+/* Базовые переходы и статический фиолетовый цвет */
+#kontur-meeting-button-icon {
+  transition: all 0.2s ease;
+  fill: #9370DB; /* Фиолетовый цвет в статике */
+}
+
+/* 1. Hover эффект - увеличение */
+/* 3. Glow эффект - свечение при hover */
+.channel-header__icon:has(#kontur-meeting-button-icon):hover svg {
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 4px #9370DB);
+}
+
+/* Active эффект - "нажатие" кнопки */
+.channel-header__icon:has(#kontur-meeting-button-icon):active svg {
+  transform: scale(0.95);
+}
+
+/* 2. Pulse при открытом dropdown - выраженная анимация с ярким цветом */
+#kontur-meeting-button-icon.dropdown-open {
+  animation: expressive-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes expressive-pulse {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+    fill: #9370DB; /* Фиолетовый - базовый цвет */
+    filter: drop-shadow(0 0 2px #9370DB);
+  }
+  50% { 
+    opacity: 1;
+    transform: scale(1.1);
+    fill: #FF69B4; /* Розовый при пульсации */
+    filter: drop-shadow(0 0 12px #FF69B4) drop-shadow(0 0 6px rgba(255, 105, 180, 0.6));
+  }
+}
+

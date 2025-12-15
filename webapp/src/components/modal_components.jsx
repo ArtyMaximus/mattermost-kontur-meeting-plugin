@@ -89,6 +89,7 @@ export const TimeSelector = ({
           value={selectedHour}
           onChange={(e) => handleTimeChange(e.target.value, selectedMinute)}
           required
+          className={errors.meetingTime ? 'error' : ''}
           style={{
             flex: 1,
             padding: '8px 12px',
@@ -110,6 +111,7 @@ export const TimeSelector = ({
           value={selectedMinute}
           onChange={(e) => handleTimeChange(selectedHour, e.target.value)}
           required
+          className={errors.meetingTime ? 'error' : ''}
           style={{
             flex: 1,
             padding: '8px 12px',
@@ -121,14 +123,18 @@ export const TimeSelector = ({
           }}
         >
           <option value="">Мин</option>
-          <option value="00">00</option>
-          <option value="15">15</option>
-          <option value="30">30</option>
-          <option value="45">45</option>
+          {Array.from({ length: 12 }, (_, i) => {
+            const value = i * 5;
+            return (
+              <option key={value} value={value.toString().padStart(2, '0')}>
+                {value.toString().padStart(2, '0')}
+              </option>
+            );
+          })}
         </select>
       </div>
       {errors.meetingTime && (
-        <div style={{color: 'red', fontSize: '12px', marginTop: '4px'}}>
+        <div className="error-message">
           {errors.meetingTime}
         </div>
       )}
@@ -144,7 +150,7 @@ TimeSelector.propTypes = {
 };
 
 // Time Presets Component
-export const TimePresets = ({ applyTimePreset }) => {
+export const TimePresets = ({ applyTimePreset, selectedQuick }) => {
   const presets = [
     { key: '15min', label: 'Через 15 минут' },
     { key: '30min', label: 'Через 30 минут' },
@@ -153,52 +159,25 @@ export const TimePresets = ({ applyTimePreset }) => {
   ];
 
   return (
-    <div style={{
-      marginTop: '8px',
-      padding: '12px',
-      backgroundColor: 'var(--center-channel-color-08, #f5f5f5)',
-      borderRadius: '4px',
-      border: '1px solid var(--center-channel-color-16, #e0e0e0)'
-    }}>
-      <div style={{
-        fontSize: '12px',
-        fontWeight: '600',
-        color: 'var(--center-channel-color-64, #666)',
-        marginBottom: '8px'
-      }}>
-        Быстрый выбор
-      </div>
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '6px'
-      }}>
-        {presets.map(preset => (
-          <button
-            key={preset.key}
-            type="button"
-            onClick={() => applyTimePreset(preset.key)}
-            style={{
-              padding: '6px 12px',
-              fontSize: '12px',
-              border: '1px solid var(--center-channel-color-16, #ccc)',
-              borderRadius: '4px',
-              backgroundColor: 'var(--center-channel-bg, #fff)',
-              color: 'var(--center-channel-color, #000)',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {preset.label}
-          </button>
-        ))}
-      </div>
+    <div className="quick-time-buttons">
+      {presets.map(preset => (
+        <button
+          key={preset.key}
+          type="button"
+          data-time={preset.key}
+          className={selectedQuick === preset.key ? 'active' : ''}
+          onClick={() => applyTimePreset(preset.key)}
+        >
+          {preset.label}
+        </button>
+      ))}
     </div>
   );
 };
 
 TimePresets.propTypes = {
-  applyTimePreset: PropTypes.func.isRequired
+  applyTimePreset: PropTypes.func.isRequired,
+  selectedQuick: PropTypes.string
 };
 
 // Duration Selector Component
@@ -229,6 +208,7 @@ export const DurationSelector = ({ duration, setDuration, errors }) => {
         value={duration}
         onChange={(e) => setDuration(e.target.value)}
         required
+        className={errors.duration ? 'error' : ''}
         style={{
           width: '100%',
           padding: '8px 12px',
@@ -244,7 +224,7 @@ export const DurationSelector = ({ duration, setDuration, errors }) => {
         ))}
       </select>
       {errors.duration && (
-        <div style={{color: 'red', fontSize: '12px', marginTop: '4px'}}>
+        <div className="error-message">
           {errors.duration}
         </div>
       )}
@@ -290,6 +270,7 @@ export const ParticipantSelector = ({
           value={participantSearch}
           onChange={(e) => setParticipantSearch(e.target.value)}
           placeholder="Начните вводить имя пользователя..."
+          className={errors.participants ? 'error' : ''}
           style={{
             width: '100%',
             padding: '8px 12px',
@@ -384,11 +365,11 @@ export const ParticipantSelector = ({
       )}
 
       {errors.participants && (
-        <div style={{color: 'red', fontSize: '12px', marginTop: '4px'}}>
+        <div className="error-message">
           {errors.participants}
         </div>
       )}
-      <div style={{color: 'var(--center-channel-color-64, #666)', fontSize: '12px', marginTop: '4px'}}>
+      <div className="field-hint">
         {isDirectChannel 
           ? 'Собеседник директ-канала будет добавлен автоматически. Вы можете добавить дополнительных участников через поиск.'
           : 'Выберите участников через поиск (можно искать по username, имени, фамилии)'}

@@ -9,6 +9,7 @@ import { PluginCore } from './core/plugin-core.js';
 import { DropdownManager } from './managers/dropdown-manager.js';
 import { ModalManager } from './managers/modal-manager.js';
 import { handleInstantCall } from './handlers/instant-call-handler.js';
+import './styles.css';
 
 /**
  * Main plugin class - orchestrates all managers and handlers
@@ -70,12 +71,16 @@ class KonturMeetingPlugin {
 
     // Register channel header button - opens React dropdown component
     const serviceName = this.core.getServiceName();
+    // Use serviceName in tooltip but keep "Kontur Meeting Plugin" prefix for reliable button search
+    const tooltipText = serviceName 
+      ? `Kontur Meeting Plugin - ${serviceName}` 
+      : 'Kontur Meeting Plugin';
     registry.registerChannelHeaderButtonAction(
       icon,
       (channel, channelMember) => {
         this.dropdownManager.openDropdown(channel, channelMember);
       },
-      serviceName ? `Создать встречу ${serviceName}` : 'Создать встречу',
+      tooltipText,
       'kontur-meeting-button'
     );
 

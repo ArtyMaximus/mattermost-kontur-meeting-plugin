@@ -7,6 +7,36 @@ import { logger } from '../utils/logger.js';
 import { formatErrorMessage } from '../utils/helpers.js';
 
 /**
+ * Convert UTC time to Moscow timezone (MSK) in RFC3339 format
+ * @param {Date} date - Date object (defaults to current time)
+ * @returns {string} Time in MSK timezone (RFC3339 format)
+ */
+function convertToMSK(date = new Date()) {
+  // Get time components in Moscow timezone
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Moscow',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  
+  const parts = formatter.formatToParts(date);
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  const hours = parts.find(p => p.type === 'hour').value;
+  const minutes = parts.find(p => p.type === 'minute').value;
+  const seconds = parts.find(p => p.type === 'second').value;
+  
+  // Format as RFC3339 with +03:00 offset (MSK is always UTC+3)
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}+03:00`;
+}
+
+/**
  * Handle instant call creation
  * @param {Object} channel - Current channel object
  * @param {Object} pluginCore - PluginCore instance
@@ -45,6 +75,9 @@ export async function handleInstantCall(channel, pluginCore) {
       email: currentUser.email || '(не указан)'
     });
 
+    // Get current time
+    const now = new Date();
+    
     // Prepare webhook payload
     const webhookPayload = {
       operation_type: 'instant_call',  // Тип операции: быстрый созвон
@@ -54,7 +87,9 @@ export async function handleInstantCall(channel, pluginCore) {
       user_id: currentUser.id,
       username: currentUser.username,
       user_email: currentUser.email || null,  // Email может быть не заполнен
-      timestamp: new Date().toISOString()
+      start_time_utc: now.toISOString(),  // UTC time in RFC3339 format
+      start_time_msk: convertToMSK(now),   // MSK time in RFC3339 format
+      timestamp: now.toISOString()
     };
 
     logger.debug('Создание быстрого созвона (instant_call)');

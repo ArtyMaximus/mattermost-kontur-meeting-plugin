@@ -41,6 +41,13 @@ export class DropdownManager {
     logger.debug('Opening dropdown menu for channel:', channel.id);
     this.dropdownChannel = channel;
     this.isDropdownOpen = true;
+    
+    // При открытии dropdown - добавить класс для анимации
+    const icon = document.getElementById('kontur-meeting-button-icon');
+    if (icon) {
+      icon.classList.add('dropdown-open');
+    }
+    
     this.renderDropdown();
   }
 
@@ -51,6 +58,13 @@ export class DropdownManager {
     logger.debug('Closing dropdown menu');
     this.isDropdownOpen = false;
     this.dropdownChannel = null;
+    
+    // При закрытии dropdown - удалить класс для анимации
+    const icon = document.getElementById('kontur-meeting-button-icon');
+    if (icon) {
+      icon.classList.remove('dropdown-open');
+    }
+    
     this.renderDropdown();
   }
 
@@ -135,27 +149,75 @@ export class DropdownManager {
         manager.closeDropdown();
       };
 
-      // Find channel header position
-      const header = document.querySelector('.channel-header__links') || 
-                     document.querySelector('.channel-header');
-      const rect = header ? header.getBoundingClientRect() : { bottom: 60, right: 16 };
+      // Find plugin button position using multiple fallback strategies
+      // Primary: search by SVG icon ID
+      let button = document.getElementById('kontur-meeting-button-icon')?.closest('button');
+      
+      // Fallback #1: search by aria-label
+      if (!button) {
+        button = document.querySelector('button[aria-label*="Kontur Meeting Plugin"]');
+      }
+      
+      // Fallback #2: search by channel header icon class and viewBox
+      if (!button) {
+        const svg = document.querySelector('.channel-header__icon svg[viewBox="0 0 32 32"]');
+        if (svg) {
+          button = svg.closest('button');
+        }
+      }
+      
+      // Fallback #3: search by data-plugin-id (legacy)
+      if (!button) {
+        button = document.querySelector('[data-plugin-id="kontur-meeting-button"]');
+      }
+
+      if (!button) {
+        logger.error('[Kontur Plugin] Channel header button not found');
+        // Use fallback position
+        const dropdownStyle = {
+          position: 'fixed',
+          top: '60px',
+          right: '16px',
+          left: 'auto',
+          background: 'var(--center-channel-bg, #fff)',
+          border: '1px solid var(--center-channel-color-16, rgba(0,0,0,0.1))',
+          borderRadius: '4px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          zIndex: 9999,
+          minWidth: '200px',
+          padding: '4px 0'
+        };
+        return createElementWithProps('div', { ref: dropdownRef, style: dropdownStyle }, []);
+      }
+
+      const buttonRect = button.getBoundingClientRect();
+
+      // Calculate dropdown position relative to button
+      // Always open dropdown below the button, aligned to the right edge of the button
+      const spacing = 4; // spacing between button and dropdown
+      
+      let dropdownStyle = {
+        position: 'fixed',
+        // Horizontal positioning - align to the RIGHT edge of the button
+        right: `${window.innerWidth - buttonRect.right}px`,
+        left: 'auto',
+        // Vertical positioning - always below the button with 4px spacing
+        top: `${buttonRect.bottom + spacing}px`,
+        bottom: 'auto',
+        background: 'var(--center-channel-bg, #fff)',
+        border: '1px solid var(--center-channel-color-16, rgba(0,0,0,0.1))',
+        borderRadius: '4px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        zIndex: 9999,
+        minWidth: '200px',
+        padding: '4px 0'
+      };
 
       return createElementWithProps(
         'div',
         {
           ref: dropdownRef,
-          style: {
-            position: 'fixed',
-            top: `${rect.bottom + 4}px`,
-            right: '16px',
-            background: 'var(--center-channel-bg, #fff)',
-            border: '1px solid var(--center-channel-color-16, rgba(0,0,0,0.1))',
-            borderRadius: '4px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            zIndex: 10000,
-            minWidth: '200px',
-            padding: '4px 0'
-          }
+          style: dropdownStyle
         },
         [
           // Instant call button
