@@ -135,27 +135,53 @@ export class DropdownManager {
         manager.closeDropdown();
       };
 
-      // Find channel header position
-      const header = document.querySelector('.channel-header__links') || 
-                     document.querySelector('.channel-header');
-      const rect = header ? header.getBoundingClientRect() : { bottom: 60, right: 16 };
+      // Find plugin button position
+      const button = document.querySelector('[data-plugin-id="kontur-meeting-button"]');
+      const buttonRect = button ? button.getBoundingClientRect() : null;
+
+      // Calculate dropdown position relative to button
+      // Dropdown height is approximately 180px (3 menu items + padding)
+      const dropdownHeight = 180;
+      const spacing = 4; // spacing between button and dropdown
+      
+      let dropdownStyle = {
+        position: 'fixed',
+        right: '16px',
+        background: 'var(--center-channel-bg, #fff)',
+        border: '1px solid var(--center-channel-color-16, rgba(0,0,0,0.1))',
+        borderRadius: '4px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        zIndex: 10000,
+        minWidth: '200px',
+        padding: '4px 0'
+      };
+
+      if (buttonRect) {
+        const spaceBelow = window.innerHeight - buttonRect.bottom;
+        const spaceAbove = buttonRect.top;
+        
+        if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
+          // Enough space below or more space below than above — open downward
+          dropdownStyle.top = `${buttonRect.bottom + spacing}px`;
+          dropdownStyle.bottom = 'auto';
+        } else {
+          // Not enough space below — open upward
+          // Position dropdown above button: calculate top position to place dropdown above button
+          dropdownStyle.top = `${buttonRect.top - dropdownHeight - spacing}px`;
+          dropdownStyle.bottom = 'auto';
+        }
+      } else {
+        // Fallback if button not found
+        logger.warn('Plugin button not found, using fallback position');
+        dropdownStyle.top = '60px';
+        dropdownStyle.bottom = 'auto';
+      }
 
       return createElementWithProps(
         'div',
         {
           ref: dropdownRef,
-          style: {
-            position: 'fixed',
-            top: `${rect.bottom + 4}px`,
-            right: '16px',
-            background: 'var(--center-channel-bg, #fff)',
-            border: '1px solid var(--center-channel-color-16, rgba(0,0,0,0.1))',
-            borderRadius: '4px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            zIndex: 10000,
-            minWidth: '200px',
-            padding: '4px 0'
-          }
+          style: dropdownStyle
         },
         [
           // Instant call button
