@@ -40,13 +40,20 @@ function convertToMSK(date = new Date()) {
  * Handle instant call creation
  * @param {Object} channel - Current channel object
  * @param {Object} pluginCore - PluginCore instance
+ * @param {Object} context - Optional context with postId and rootId for thread replies
+ * @param {string} context.postId - ID of the post where action was triggered
+ * @param {string} context.rootId - ID of the root post in thread
  * @returns {Promise<void>}
  */
-export async function handleInstantCall(channel, pluginCore) {
+export async function handleInstantCall(channel, pluginCore, context = {}) {
+  const { postId, rootId } = context;
+  
   logger.debug('Создание мгновенной встречи:', {
     channel: channel.display_name || channel.name,
     channelId: channel.id,
-    channelType: channel.type
+    channelType: channel.type,
+    postId,
+    rootId
   });
 
   try {
@@ -89,7 +96,9 @@ export async function handleInstantCall(channel, pluginCore) {
       user_email: currentUser.email || null,  // Email может быть не заполнен
       start_time_utc: now.toISOString(),  // UTC time in RFC3339 format
       start_time_msk: convertToMSK(now),   // MSK time in RFC3339 format
-      timestamp: now.toISOString()
+      timestamp: now.toISOString(),
+      root_id: rootId || '',  // ID родительского поста (root сообщения треда)
+      is_thread_reply: !!rootId  // Флаг что встреча создана в треде
     };
 
     logger.debug('Создание быстрого созвона (instant_call)');
@@ -148,8 +157,9 @@ export async function handleInstantCall(channel, pluginCore) {
       return;
     }
 
-    // Create post in the channel
-    await pluginCore.createPost(channel.id, `📞 Я создал встречу: ${roomUrl}`);
+    // Create post in the channel or thread
+    const postMessage = `📞 Я создал встречу: ${roomUrl}`;
+    await pluginCore.createPost(channel.id, postMessage, rootId || null);
 
     // Open meeting room in new tab (default: true)
     const openInNewTab = pluginCore.shouldOpenInNewTab();

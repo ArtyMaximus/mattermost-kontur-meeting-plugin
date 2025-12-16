@@ -6,7 +6,6 @@
   "support_url": "https://github.com/skyeng/mattermost-kontur-meeting-plugin/issues",
   "version": "1.0.0",
   "min_server_version": "7.8.0",
-  "icon_path": "assets/icon.svg",
   "server": {
     "executables": {
       "linux-amd64": "server/dist/plugin-linux-amd64",
@@ -65,4 +64,3 @@
     ]
   }
 }
-

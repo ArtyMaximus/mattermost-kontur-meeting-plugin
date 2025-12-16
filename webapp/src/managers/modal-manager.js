@@ -20,17 +20,25 @@ export class ModalManager {
     this.isModalOpen = false;
     this.isAboutModalOpen = false;
     this.currentChannel = null;
+    this.postContext = null; // { postId, rootId }
   }
 
   /**
    * Open schedule meeting modal
    * @param {Object} channel - Current channel object
+   * @param {Object} context - Optional context with postId and rootId for thread replies
+   * @param {string} context.postId - ID of the post where action was triggered
+   * @param {string} context.rootId - ID of the root post in thread (if post is in thread)
    */
-  openScheduleModal(channel) {
+  openScheduleModal(channel, context = {}) {
+    const { postId, rootId } = context;
+    
     logger.debug('Открытие модального окна планирования встречи:', {
       channel: channel.display_name || channel.name,
       channelId: channel.id,
-      channelType: channel.type
+      channelType: channel.type,
+      postId,
+      rootId
     });
 
     // Check if webhook URL is configured
@@ -42,6 +50,7 @@ export class ModalManager {
     }
 
     this.currentChannel = channel;
+    this.postContext = (postId || rootId) ? { postId, rootId } : null;
     this.isModalOpen = true;
     this.renderModal();
   }
@@ -52,6 +61,7 @@ export class ModalManager {
   closeScheduleModal() {
     this.isModalOpen = false;
     this.currentChannel = null;
+    this.postContext = null;
     this.renderModal();
   }
 
@@ -91,18 +101,26 @@ export class ModalManager {
     // Условный рендеринг модалки на основе isModalOpen
     if (this.isModalOpen && this.currentChannel) {
       // Рендерить модальное окно
+      const modalProps = {
+        channel: this.currentChannel,
+        onClose: () => {
+          logger.debug('Модальное окно закрыто - вызов closeScheduleModal');
+          this.closeScheduleModal();
+        },
+        onSuccess: () => {
+          logger.debug('Meeting scheduled successfully - вызов closeScheduleModal');
+          this.closeScheduleModal();
+        }
+      };
+      
+      // Добавить контекст поста, если модалка открыта из Post Action
+      if (this.postContext) {
+        modalProps.postId = this.postContext.postId;
+        modalProps.rootId = this.postContext.rootId;
+      }
+      
       this.currentModal = renderReactComponent(
-        createElementWithProps(ScheduleMeetingModal, {
-          channel: this.currentChannel,
-          onClose: () => {
-            logger.debug('Модальное окно закрыто - вызов closeScheduleModal');
-            this.closeScheduleModal();
-          },
-          onSuccess: () => {
-            logger.debug('Meeting scheduled successfully - вызов closeScheduleModal');
-            this.closeScheduleModal();
-          }
-        }),
+        createElementWithProps(ScheduleMeetingModal, modalProps),
         this.modalContainer
       );
     } else {
@@ -168,6 +186,7 @@ export class ModalManager {
     this.isModalOpen = false;
     this.isAboutModalOpen = false;
     this.currentChannel = null;
+    this.postContext = null;
   }
 }
 

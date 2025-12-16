@@ -43,6 +43,7 @@ type ScheduleRequest struct {
 	NotifyParticipants      bool     `json:"notify_participants"`
 	CreateGoogleCalendarEvent bool   `json:"create_google_calendar_event"`
 	ServiceName            string   `json:"service_name"`
+	RootID                 string   `json:"root_id"` // ID родительского сообщения для создания поста в треде
 }
 
 // validateScheduleRequest validates and parses the incoming request
@@ -325,6 +326,8 @@ func (p *Plugin) buildWebhookPayload(req *ScheduleRequest, currentUser *model.Us
 		"auto_detected":              false,
 		"source":                     "user_selection",
 		"timestamp":                  time.Now().Format(time.RFC3339),
+		"root_id":                    req.RootID,
+		"is_thread_reply":            req.RootID != "",
 	}
 
 	return payload
@@ -431,8 +434,8 @@ func (p *Plugin) sendWebhook(webhookURL string, payload map[string]interface{}) 
 	return webhookData, nil
 }
 
-// createPost creates a post in the channel
-func (p *Plugin) createPost(channel *model.Channel, currentUser *model.User, participants []*model.User, scheduledAt time.Time, duration int, roomURL string) error {
+// createPost creates a post in the channel or thread
+func (p *Plugin) createPost(channel *model.Channel, currentUser *model.User, participants []*model.User, scheduledAt time.Time, duration int, roomURL string, rootID string) error {
 	// Format participants list
 	participantsList := ""
 	for i, user := range participants {
@@ -459,12 +462,30 @@ func (p *Plugin) createPost(channel *model.Channel, currentUser *model.User, par
 		UserId:    currentUser.Id,
 	}
 
+	// Если rootID указан, создаём пост в треде
+	if rootID != "" {
+		// Валидация: проверяем, что rootID существует и в том же канале
+		rootPost, appErr := p.API.GetPost(rootID)
+		if appErr != nil || rootPost == nil {
+			p.API.LogWarn("[Kontur] Root post not found, creating in channel root", 
+				"root_id", rootID)
+			// Создаём в корне канала, если rootID невалиден
+		} else if rootPost.ChannelId != channel.Id {
+			p.API.LogWarn("[Kontur] Root post in different channel, creating in channel root",
+				"root_id", rootID, "root_channel", rootPost.ChannelId, "target_channel", channel.Id)
+			// Создаём в корне канала
+		} else {
+			post.RootId = rootID
+			p.API.LogDebug("[Kontur] Creating post in thread", "root_id", rootID)
+		}
+	}
+
 	if _, err := p.API.CreatePost(post); err != nil {
 		p.API.LogError("[Kontur] Failed to create post", "error", err.Error())
 		return err
 	}
 
-	p.API.LogDebug("[Kontur] Post created successfully")
+	p.API.LogDebug("[Kontur] Post created successfully", "root_id", rootID)
 	return nil
 }
 

@@ -6,6 +6,7 @@ import 'react-day-picker/dist/style.css';
 import { formatErrorMessage, getCurrentUserInfo } from '../utils/helpers.js';
 import { DEFAULT_TIMEZONE, REQUEST_FIELDS, ERROR_FIELD_MAP } from '../utils/constants.js';
 import { logger } from '../utils/logger.js';
+import ErrorBoundary from './error_boundary.jsx';
 import { 
   DurationSelector, 
   ParticipantSelector,
@@ -14,9 +15,12 @@ import {
 } from './modal_components.jsx';
 import './schedule-meeting-modal.css';
 
-const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
+const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => {
   // Определяем, является ли канал директом (DM)
   const isDirectChannel = channel && channel.type === 'D';
+  
+  // Определяем источник открытия модалки (Post Action vs кнопка в шапке)
+  const isFromThread = Boolean(rootId || postId);
   
   // Состояние для ленивой загрузки секций
   const [isReady, setIsReady] = useState(false);
@@ -304,7 +308,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     const config = window.KonturMeetingPlugin && window.KonturMeetingPlugin.config;
     const serviceName = config?.ServiceName || '';
 
-    return {
+    const requestBody = {
       [REQUEST_FIELDS.CHANNEL_ID]: channel.id,
       [REQUEST_FIELDS.TEAM_ID]: userInfo.team_id,
       [REQUEST_FIELDS.USER_ID]: userInfo.user_id,
@@ -318,6 +322,14 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       create_google_calendar_event: createGoogleEvent,
       service_name: serviceName
     };
+    
+    // Добавляем root_id если модалка открыта из Post Action (тред)
+    if (rootId) {
+      requestBody.root_id = rootId;
+      logger.debug('Добавлен root_id в запрос', { rootId, postId });
+    }
+    
+    return requestBody;
   };
 
   // Helper function to handle API errors
@@ -568,8 +580,9 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   const serviceName = config?.ServiceName || '';
 
   return (
-    <div
-      className="schedule-meeting-modal-backdrop"
+    <ErrorBoundary>
+      <div
+        className="schedule-meeting-modal-backdrop"
       style={{
         position: 'fixed',
         top: 0,
@@ -615,6 +628,25 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
         }}>
           Заполните форму для создания запланированной встречи
         </p>
+
+        {/* Индикатор контекста - показывает куда будет отправлено сообщение */}
+        <div className="meeting-context-info">
+          {isFromThread ? (
+            <>
+              <span className="context-icon">💬</span>
+              <span className="context-text">
+                Сообщение будет отправлено в тред, где было выбрано действие
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="context-icon">📢</span>
+              <span className="context-text">
+                Сообщение будет создано в {isDirectChannel ? 'директе' : 'канале'} новым сообщением
+              </span>
+            </>
+          )}
+        </div>
 
         <form onSubmit={handleSubmit}>
           {/* Дата и время */}
@@ -872,11 +904,14 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
         </form>
       </div>
     </div>
+    </ErrorBoundary>
   );
 };
 
 ScheduleMeetingModal.propTypes = {
   channel: PropTypes.object.isRequired,
+  postId: PropTypes.string,
+  rootId: PropTypes.string,
   onClose: PropTypes.func.isRequired,
   onSuccess: PropTypes.func
 };

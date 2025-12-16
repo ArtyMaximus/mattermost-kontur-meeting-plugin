@@ -36,7 +36,11 @@ dist: clean
 	@echo "Building webapp..."
 	cd webapp && npm install && npm run build
 	@echo "Creating tar.gz package..."
-	@tar -czf kontur-meeting.tar.gz plugin.json server/dist/ webapp/dist/ assets/
+	@if [ -d "assets" ] && [ "$$(ls -A assets)" ]; then \
+		tar -czf kontur-meeting.tar.gz plugin.json server/dist/ webapp/dist/ assets/; \
+	else \
+		tar -czf kontur-meeting.tar.gz plugin.json server/dist/ webapp/dist/; \
+	fi
 	@echo "Package created: kontur-meeting.tar.gz"
 
 ## Clean build artifacts
@@ -45,6 +49,3 @@ clean:
 	@rm -rf server/dist/
 	@rm -rf webapp/dist/
 	@rm -f kontur-meeting.tar.gz
-
-
-

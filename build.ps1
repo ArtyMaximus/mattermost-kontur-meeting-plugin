@@ -114,12 +114,10 @@ if (Test-Path "build_temp") {
 Write-Host "`nCreating package structure..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Path "build_temp\webapp\dist" -Force | Out-Null
 New-Item -ItemType Directory -Path "build_temp\server\dist" -Force | Out-Null
-New-Item -ItemType Directory -Path "build_temp\assets" -Force | Out-Null
 
 Copy-Item "plugin.json" "build_temp\"
 Copy-Item "webapp\dist\main.js" "build_temp\webapp\dist\"
 Copy-Item "server\dist\plugin-*" "build_temp\server\dist\"
-Copy-Item "assets\*" "build_temp\assets\" -Recurse
 
 # Step 6: Create TAR.GZ archive with executable permissions
 Write-Host "Creating kontur-meeting.tar.gz with executable permissions..." -ForegroundColor Yellow
@@ -128,7 +126,7 @@ if (Get-Command wsl -ErrorAction SilentlyContinue) {
     Write-Host "Using WSL to create archive with proper permissions..." -ForegroundColor Cyan
     # Use WSL bash script to set permissions and create tar
     wsl bash build-archive.sh
-    
+
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to create archive with WSL" -ForegroundColor Red
         Remove-Item -Path "build_temp" -Recurse -Force
@@ -138,12 +136,19 @@ if (Get-Command wsl -ErrorAction SilentlyContinue) {
     Write-Host "WARNING: WSL not found!" -ForegroundColor Red
     Write-Host "Archive will be created without executable permissions." -ForegroundColor Yellow
     Write-Host "You will need to fix permissions manually after uploading to Mattermost." -ForegroundColor Yellow
-    
+
     # Fallback to Windows tar (without executable permissions)
     Push-Location build_temp
-    tar -czf "..\kontur-meeting.tar.gz" plugin.json webapp server assets
+    $tarArgs = @("plugin.json", "webapp", "server")
+    if (Test-Path "assets" -PathType Container) {
+        $assetsFiles = Get-ChildItem "assets" -ErrorAction SilentlyContinue
+        if ($assetsFiles) {
+            $tarArgs += "assets"
+        }
+    }
+    tar -czf "..\kontur-meeting.tar.gz" $tarArgs
     Pop-Location
-    
+
     Write-Host ""
     Write-Host "To fix permissions manually:" -ForegroundColor Yellow
     Write-Host "1. SSH to Mattermost server" -ForegroundColor White

@@ -23,6 +23,15 @@ type Configuration struct {
 
 // OnActivate is called when the plugin is activated
 func (p *Plugin) OnActivate() error {
+	// Защита от паники при активации
+	defer func() {
+		if r := recover(); r != nil {
+			if p != nil && p.API != nil {
+				p.API.LogError("[Kontur] Plugin activation panic recovered", "error", fmt.Sprintf("%v", r))
+			}
+		}
+	}()
+
 	p.API.LogInfo("Kontur.Talk Meeting plugin activated")
 	
 	// Check that configuration is valid
@@ -52,6 +61,22 @@ func (p *Plugin) OnConfigurationChange() error {
 
 // ServeHTTP handles HTTP requests to the plugin
 func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
+	// Защита от паники в HTTP handlers
+	defer func() {
+		if rec := recover(); rec != nil {
+			if p != nil && p.API != nil {
+				p.API.LogError("[Kontur] HTTP handler panic recovered",
+					"path", r.URL.Path,
+					"method", r.Method,
+					"error", fmt.Sprintf("%v", rec),
+				)
+			}
+			if w.Header().Get("Content-Type") == "" {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+		}
+	}()
+
 	// Route requests based on path
 	switch r.URL.Path {
 	case "/config":
@@ -65,6 +90,18 @@ func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Req
 
 // handleGetConfig returns the plugin configuration as JSON
 func (p *Plugin) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	// Защита от паники
+	defer func() {
+		if rec := recover(); rec != nil {
+			if p != nil && p.API != nil {
+				p.API.LogError("[Kontur] handleGetConfig panic recovered", "error", fmt.Sprintf("%v", rec))
+			}
+			if w.Header().Get("Content-Type") == "" {
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+		}
+	}()
+
 	// Only allow GET requests
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -247,8 +284,8 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Step 8: Create post in channel
-	if err := p.createPost(channel, currentUser, participants, scheduledAt, req.DurationMinutes, roomURL); err != nil {
+	// Step 8: Create post in channel or thread
+	if err := p.createPost(channel, currentUser, participants, scheduledAt, req.DurationMinutes, roomURL, req.RootID); err != nil {
 		// Don't fail the request if post creation fails (meeting is already created)
 		p.API.LogWarn("[Kontur] Failed to create post, but meeting was created", "error", err.Error())
 	}

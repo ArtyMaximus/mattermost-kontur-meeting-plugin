@@ -9,10 +9,9 @@ chmod +x build_temp/server/dist/plugin-*
 
 # Create tar.gz from build_temp directory
 cd build_temp
-tar -czf ../kontur-meeting.tar.gz plugin.json webapp server assets
+tar -czf ../kontur-meeting.tar.gz plugin.json webapp server
 
 echo "Done! Archive created: kontur-meeting.tar.gz"
 echo ""
 echo "Verifying permissions in archive:"
 tar -tzf ../kontur-meeting.tar.gz | head -10
-
