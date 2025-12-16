@@ -542,3 +542,53 @@
   margin-top: 8px;
   margin-left: 30px;
 }
+
+
+/* ==========================================
+   ИНДИКАТОР КОНТЕКСТА ВСТРЕЧИ
+   ========================================== */
+
+.meeting-context-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  background: rgba(var(--button-bg-rgb, 22, 109, 224), 0.08);
+  border-left: 3px solid var(--button-bg, #166de0);
+  border-radius: 4px;
+  animation: context-fade-in 0.3s ease;
+}
+
+.meeting-context-info .context-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.meeting-context-info .context-text {
+  font-size: 13px;
+  color: rgba(var(--center-channel-color-rgb, 61, 60, 64), 0.8);
+  line-height: 1.4;
+  flex: 1;
+}
+
+@keyframes context-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Тёмная тема */
+.theme--dark .meeting-context-info {
+  background: rgba(var(--button-bg-rgb, 22, 109, 224), 0.12);
+}
+
+.theme--dark .meeting-context-info .context-text {
+  color: rgba(var(--center-channel-color-rgb, 255, 255, 255), 0.8);
+}
