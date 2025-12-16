@@ -326,33 +326,8 @@ func (p *Plugin) buildWebhookPayload(req *ScheduleRequest, currentUser *model.Us
 		"auto_detected":              false,
 		"source":                     "user_selection",
 		"timestamp":                  time.Now().Format(time.RFC3339),
-		"thread_id":                  req.RootID,
+		"root_id":                    req.RootID,
 		"is_thread_reply":            req.RootID != "",
-	}
-
-	// Если встреча в треде, добавить контекст родительского сообщения
-	if req.RootID != "" {
-		rootPost, appErr := p.API.GetPost(req.RootID)
-		if appErr == nil && rootPost != nil {
-			// Обрезаем до 200 символов для компактности
-			messageText := rootPost.Message
-			if len(messageText) > 200 {
-				messageText = messageText[:200] + "..."
-			}
-			payload["parent_message_text"] = messageText
-			payload["parent_message_user_id"] = rootPost.UserId
-			
-			p.API.LogDebug("[Kontur] Added parent message context to payload",
-				"root_id", req.RootID,
-				"message_length", len(messageText))
-		} else {
-			p.API.LogWarn("[Kontur] Failed to get root post for context",
-				"root_id", req.RootID)
-			if appErr != nil {
-				p.API.LogWarn("[Kontur] GetPost error", "error", appErr.Error())
-			}
-			// Не добавляем поля, но не падаем - встреча всё равно создастся
-		}
 	}
 
 	return payload

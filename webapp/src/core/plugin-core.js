@@ -130,18 +130,25 @@ export class PluginCore {
   }
 
   /**
-   * Create a post in the channel
+   * Create a post in the channel or thread
    * @param {string} channelId - Channel ID
    * @param {string} message - Message text
+   * @param {string} rootId - Optional root post ID for thread replies
    * @returns {Promise<Object>} Created post data
    */
-  async createPost(channelId, message) {
+  async createPost(channelId, message, rootId = null) {
     const postPayload = {
       channel_id: channelId,
       message: message
     };
 
-    logger.debug('Создание сообщения в канале', postPayload);
+    // Если rootId указан, добавляем его для создания поста в треде
+    if (rootId) {
+      postPayload.root_id = rootId;
+      logger.debug('Создание сообщения в треде', { channelId, rootId });
+    } else {
+      logger.debug('Создание сообщения в канале', { channelId });
+    }
 
     const postResponse = await fetch('/api/v4/posts', {
       method: 'POST',

@@ -150,44 +150,54 @@ class KonturMeetingPlugin {
   }
 
   /**
+   * Получить post и channel из store по postId
+   * @param {string} postId - ID поста
+   * @returns {{post: Object|null, channel: Object|null}}
+   */
+  getPostAndChannel(postId) {
+    try {
+      if (!this.core?.store || !postId) {
+        return { post: null, channel: null };
+      }
+
+      const state = this.core.store.getState();
+      const post = state.entities?.posts?.posts?.[postId];
+      
+      if (!post) {
+        return { post: null, channel: null };
+      }
+
+      let channel = null;
+      if (post.channel_id) {
+        channel = state.entities?.channels?.channels?.[post.channel_id];
+      }
+      
+      // Если канал не найден из поста, используем текущий канал
+      if (!channel) {
+        channel = this.core?.getChannel();
+      }
+
+      return { post, channel };
+    } catch (error) {
+      logger.error('[Kontur] Error getting post and channel:', error);
+      return { post: null, channel: null };
+    }
+  }
+
+  /**
    * Register Post Action with full error protection
    * @param {Object} registry - Mattermost plugin registry
    */
   registerPostAction(registry) {
     try {
-      // Правильный API Mattermost: строка + функция(postId)
+      // Post Action 1: Запланировать встречу (с модалкой)
       registry.registerPostDropdownMenuAction(
-        'Создать встречу',
+        '📅 Запланировать встречу',
         (postId) => {
           try {
-            logger.debug('[Kontur] Post action triggered for postId:', postId);
+            logger.debug('[Kontur] Schedule meeting post action triggered for postId:', postId);
 
-            // Проверка что store доступен
-            if (!this.core?.store) {
-              logger.error('[Kontur] Redux store not available');
-              return;
-            }
-
-            const state = this.core.store.getState();
-            
-            // Получаем пост из Redux store
-            const post = state.entities?.posts?.posts?.[postId];
-            
-            if (!post) {
-              logger.warn('[Kontur] Post not found in store:', postId);
-              // Продолжаем - откроем модалку без контекста треда
-            }
-
-            // Получаем канал
-            let channel = null;
-            if (post?.channel_id) {
-              channel = state.entities?.channels?.channels?.[post.channel_id];
-            }
-            
-            // Если канал не найден из поста, используем текущий канал
-            if (!channel) {
-              channel = this.core?.getChannel();
-            }
+            const { post, channel } = this.getPostAndChannel(postId);
             
             if (!channel) {
               logger.error('[Kontur] Cannot access channel');
@@ -196,11 +206,9 @@ class KonturMeetingPlugin {
             }
 
             // Определяем root_id для треда
-            // Если post.root_id существует - пост уже в треде
-            // Иначе используем сам post.id как root
             const threadRootId = post?.root_id || post?.id;
 
-            logger.debug('[Kontur] Opening modal with context:', {
+            logger.debug('[Kontur] Opening schedule modal with context:', {
               postId: post?.id,
               rootId: threadRootId,
               channelId: channel.id
@@ -217,9 +225,9 @@ class KonturMeetingPlugin {
               this.showError('Модальное окно недоступно');
             }
           } catch (error) {
-            logger.error('[Kontur] Error in post action handler:', error);
+            logger.error('[Kontur] Error in schedule meeting post action:', error);
             this.errorMonitor.logError({
-              message: 'Post action execution error',
+              message: 'Schedule meeting post action error',
               error: error?.toString(),
               stack: error?.stack,
               timestamp: new Date().toISOString()
@@ -228,8 +236,50 @@ class KonturMeetingPlugin {
           }
         }
       );
+
+      // Post Action 2: Созвониться сейчас (без модалки, быстрая встреча)
+      registry.registerPostDropdownMenuAction(
+        '📹 Созвониться сейчас',
+        (postId) => {
+          try {
+            logger.debug('[Kontur] Instant call post action triggered for postId:', postId);
+
+            const { post, channel } = this.getPostAndChannel(postId);
+            
+            if (!channel) {
+              logger.error('[Kontur] Cannot access channel');
+              this.showError('Не удалось получить информацию о канале');
+              return;
+            }
+
+            // Определяем root_id для треда
+            const threadRootId = post?.root_id || post?.id;
+
+            logger.debug('[Kontur] Creating instant call with context:', {
+              postId: post?.id,
+              rootId: threadRootId,
+              channelId: channel.id
+            });
+
+            // Вызываем handleInstantCall с контекстом треда
+            this.handleInstantCall(channel, {
+              postId: post?.id ? String(post.id) : undefined,
+              rootId: threadRootId ? String(threadRootId) : undefined
+            });
+          } catch (error) {
+            logger.error('[Kontur] Error in instant call post action:', error);
+            this.errorMonitor.logError({
+              message: 'Instant call post action error',
+              error: error?.toString(),
+              stack: error?.stack,
+              timestamp: new Date().toISOString()
+            });
+            this.showError('Не удалось создать быструю встречу');
+          }
+        }
+      );
     } catch (registrationError) {
-      logger.error('[Kontur] Failed to register post action:', registrationError);
+      logger.error('[Kontur] Failed to register post actions:', registrationError);
       this.errorMonitor.logError({
         message: 'Post action registration error',
         error: registrationError?.toString(),
@@ -285,9 +335,10 @@ class KonturMeetingPlugin {
   /**
    * Handle instant call button click
    * @param {Object} channel - Current channel object
+   * @param {Object} context - Optional context with postId and rootId for thread replies
    */
-  async handleInstantCall(channel) {
-    await handleInstantCall(channel, this.core);
+  async handleInstantCall(channel, context = {}) {
+    await handleInstantCall(channel, this.core, context);
   }
 
   /**
