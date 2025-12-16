@@ -9,9 +9,11 @@
 **Основные возможности:**
 - **Мгновенные встречи**: Создать и присоединиться к встрече немедленно
 - **Запланированные встречи**: Планировать встречи с указанием даты, времени, длительности и участников
+- **Создание встреч из тредов**: Создавайте встречи прямо из контекстного меню сообщений — встреча автоматически создаётся в треде
 - **Интеграция с каналами**: Работает в публичных каналах, приватных каналах и личных сообщениях
-- **Автоматическая публикация**: Создаёт пост в канале со ссылкой на встречу
+- **Автоматическая публикация**: Создаёт пост в канале со ссылкой на встречу (в корне канала или в треде)
 - **Удобный интерфейс**: React-модалка для планирования с пресетами времени и поиском участников
+- **Индикация контекста**: Визуальная подсказка показывает, куда будет отправлено сообщение о встрече
 - **Информация о плагине**: Модальное окно с информацией об авторе и контактах
 
 ## Использование
@@ -39,6 +41,24 @@
    - **Создать событие в Google Calendar**: Опционально — автоматическое создание события в Google Calendar для всех участников (обрабатывается в n8n)
 4. Нажмите **"Создать встречу"**
 5. В канале появляется пост с деталями встречи
+
+#### Создание встречи из контекстного меню сообщения
+
+Теперь вы можете создавать встречи прямо из тредов:
+
+1. Найдите сообщение, в ответ на которое хотите создать встречу
+2. Нажмите на три точки (⋮) в правом верхнем углу сообщения
+3. Выберите **"Создать встречу"** из контекстного меню
+4. Откроется модальное окно планирования встречи
+5. В верхней части модалки вы увидите индикатор: **💬 Сообщение будет отправлено в тред, где было выбрано действие**
+6. Заполните форму и нажмите **"Создать встречу"**
+7. Сообщение о встрече появится в треде выбранного сообщения
+
+**Отличия от кнопки в шапке канала:**
+- **Кнопка в шапке канала**: Создаёт встречу новым сообщением в корне канала
+- **Контекстное меню сообщения**: Создаёт встречу в треде выбранного сообщения
+
+**Примечание**: Индикатор в модалке всегда показывает, куда будет отправлено сообщение о встрече — в корне канала или в треде.
 
 #### Информация о плагине
 
@@ -83,6 +103,18 @@
 ### 8. Настройка в панели администратора
 
 ![Настройка в панели администратора](https://private-user-images.githubusercontent.com/68598437/526715225-a6c49cff-8ee5-4dee-9d72-5e3ecb8b01c9.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4MjQzNTcsIm5iZiI6MTc2NTgyNDA1NywicGF0aCI6Ii82ODU5ODQzNy81MjY3MTUyMjUtYTZjNDljZmYtOGVlNS00ZGVlLTlkNzItNWUzZWNiOGIwMWM5LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE1VDE4NDA1N1omWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTE5YzUzMWI2OTMyZTEwMDQ5ZmRhMzI4M2M4MmIyYjgyZTU1OGMwNzhkMWFkZjFjMjVkMDY4NWU4OTQxMmJjYzgmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.xzyyWGThcZim2ua69uHBp8iZ404375CQ2lbqMDOymsk)
+
+### 9. Создание встречи из контекстного меню сообщения
+
+![Создание встречи из контекстного меню](https://private-user-images.githubusercontent.com/68598437/527098144-c39f3fc5-1afd-4b44-8b71-77605d70198a.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4OTQxMzMsIm5iZiI6MTc2NTg5MzgzMywicGF0aCI6Ii82ODU5ODQzNy81MjcwOTgxNDQtYzM5ZjNmYzUtMWFmZC00YjQ0LThiNzEtNzc2MDVkNzAxOThhLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTYlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE2VDE0MDM1M1omWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWRjYWQzZmY3YzY3MzQzNGI4Mjc4ODI5ZDQxNWU5MmQ1NTJkNGRjZWMzMGJmYjhkOWZkYzg2NDczZjE2Y2Q5NzMmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.fB7WVs5y3M6P3fImGB4nDk9MVU82kDohKCwBR8WCFHw)
+
+*Скриншот: Пункт "Создать встречу" в контекстном меню сообщения (три точки)*
+
+### 10. Модалка планирования с индикатором контекста треда
+
+![Модалка с индикатором треда](https://private-user-images.githubusercontent.com/68598437/527098900-568141c4-ccd3-43ad-b8de-5ef3eaa6c3a6.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjU4OTQyMjgsIm5iZiI6MTc2NTg5MzkyOCwicGF0aCI6Ii82ODU5ODQzNy81MjcwOTg5MDAtNTY4MTQxYzQtY2NkMy00M2FkLWI4ZGUtNWVmM2VhYTZjM2E2LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTEyMTYlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUxMjE2VDE0MDUyOFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTIxYTQ3MjVlMmU5Njk4ODc5ZmEyNjQyOTlmZDg0ZDhiYTA2NmIzNTQzYWVhOGU5NGJmZmE5NWFhMDkxY2E5YTgmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.XuMqyD1iOgyUgW6c8SdkfwJ5ehBXK-PgAMZvOm1RuRw)
+
+*Скриншот: Модальное окно планирования встречи с индикатором, показывающим что сообщение будет отправлено в тред*
 
 
 ## Архитектура
@@ -328,7 +360,7 @@ tar -czf kontur-meeting.tar.gz plugin.json webapp/dist/ server/dist/ assets/
    # Webapp (режим watch)
    cd webapp
    npm run build  # Пересобрать после изменений
-   
+
    # Server (пересобрать после изменений)
    cd server
    go build -o dist/plugin-linux-amd64 .
@@ -462,4 +494,3 @@ MIT
 
 ## Поддержка
 - **Документация плагинов Mattermost**: https://developers.mattermost.com/integrate/plugins/
-
