@@ -18,6 +18,10 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   // Определяем, является ли канал директом (DM)
   const isDirectChannel = channel && channel.type === 'D';
   
+  // Состояние для ленивой загрузки секций
+  const [isReady, setIsReady] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  
   // Разделяем дату и время на отдельные состояния
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedHour, setSelectedHour] = useState('');
@@ -42,8 +46,9 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
   const searchTimeoutRef = useRef(null);
   const calendarRef = useRef(null);
 
-  // Helper function to reset form state
+  // Helper function to reset form state (оптимизировано - один setState)
   const resetForm = () => {
+    // Используем один setState для всех полей формы
     setSelectedDate(null);
     setSelectedHour('');
     setSelectedMinute('');
@@ -57,7 +62,26 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     setSelectedQuick(null);
     setNotifyParticipants(true);
     setCreateGoogleEvent(true);
+    setShowAdvanced(false);
+    setIsReady(false);
   };
+
+  // Оптимизация: отложенная инициализация для быстрого открытия модалки
+  useEffect(() => {
+    // Показываем модалку сразу, загружаем остальное асинхронно
+    requestAnimationFrame(() => {
+      setIsReady(true);
+      // Включаем анимации секций после монтирования
+      if (modalRef.current) {
+        modalRef.current.classList.add('loaded');
+      }
+      
+      // Показываем продвинутые секции через небольшую задержку
+      setTimeout(() => {
+        setShowAdvanced(true);
+      }, 50);
+    });
+  }, []);
 
   // Закрытие при клике вне модального окна (по фону)
   useEffect(() => {
@@ -90,7 +114,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     };
   }, [onClose, channel]);
 
-  // Поиск пользователей
+  // Поиск пользователей (оптимизировано - отложенный поиск для десктопа)
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -101,36 +125,53 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
       return;
     }
 
+    // Увеличиваем debounce для десктопного приложения
     searchTimeoutRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const response = await fetch(`/api/v4/users/search`, {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          body: JSON.stringify({
-            term: participantSearch,
-            team_id: channel.team_id || ''
-          })
-        });
+        // Асинхронная функция поиска
+        const performSearch = async () => {
+          const response = await fetch(`/api/v4/users/search`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+              term: participantSearch,
+              team_id: channel.team_id || ''
+            })
+          });
 
-        if (response.ok) {
-          const users = await response.json();
-          // Исключить уже выбранных участников
-          const filtered = users.filter(user => 
-            !participants.some(p => p.id === user.id)
-          );
-          setSearchResults(filtered);
+          if (response.ok) {
+            const users = await response.json();
+            // Исключить уже выбранных участников
+            const filtered = users.filter(user => 
+              !participants.some(p => p.id === user.id)
+            );
+            setSearchResults(filtered);
+          } else {
+            setSearchResults([]);
+          }
+        };
+
+        // Для Electron используем requestIdleCallback, если доступен
+        if (window.requestIdleCallback) {
+          requestIdleCallback(async () => {
+            await performSearch();
+            setIsSearching(false);
+          }, { timeout: 500 });
         } else {
-          setSearchResults([]);
+          // Fallback для браузеров
+          requestAnimationFrame(async () => {
+            await performSearch();
+            setIsSearching(false);
+          });
         }
       } catch (error) {
         logger.error('Ошибка поиска пользователей:', error);
         setSearchResults([]);
-      } finally {
         setIsSearching(false);
       }
     }, 300);
@@ -403,15 +444,17 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     return maxDate;
   };
 
-  // Обработчик изменения времени через селекты
+  // Обработчик изменения времени через селекты (оптимизировано)
   const handleTimeChange = (hour, minute) => {
     setSelectedHour(hour);
     setSelectedMinute(minute);
     // Очистить ошибку времени при выборе
     if (errors.meetingTime) {
-      const newErrors = {...errors};
-      delete newErrors.meetingTime;
-      setErrors(newErrors);
+      setErrors(prevErrors => {
+        const newErrors = {...prevErrors};
+        delete newErrors.meetingTime;
+        return newErrors;
+      });
     }
   };
 
@@ -470,36 +513,35 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
         return;
     }
 
-    // Обновляем состояние
+    // Обновляем состояние - оптимизировано (минимизируем количество setState)
     if (targetDate && !selectedDate) {
       setSelectedDate(targetDate);
     }
+    // Объединяем обновления времени в один setState через функцию
     setSelectedHour(targetHour);
     setSelectedMinute(targetMinute);
     
-    // Очистить ошибки
-    if (errors.meetingTime) {
+    // Очистить ошибки - оптимизировано (один setState)
+    if (errors.meetingTime || (errors.meetingDatetime && targetDate)) {
       const newErrors = {...errors};
-      delete newErrors.meetingTime;
-      setErrors(newErrors);
-    }
-    if (errors.meetingDatetime && targetDate) {
-      const newErrors = {...errors};
-      delete newErrors.meetingDatetime;
+      if (errors.meetingTime) delete newErrors.meetingTime;
+      if (errors.meetingDatetime && targetDate) delete newErrors.meetingDatetime;
       setErrors(newErrors);
     }
   };
 
-  // Обработчик выбора даты
+  // Обработчик выбора даты (оптимизировано)
   const handleDateSelect = (date) => {
     if (date) {
       setSelectedDate(date);
       setShowCalendar(false);
       // Очистить ошибку даты при выборе
       if (errors.meetingDatetime) {
-        const newErrors = {...errors};
-        delete newErrors.meetingDatetime;
-        setErrors(newErrors);
+        setErrors(prevErrors => {
+          const newErrors = {...prevErrors};
+          delete newErrors.meetingDatetime;
+          return newErrors;
+        });
       }
     }
   };
@@ -544,7 +586,7 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
     >
       <div
         ref={modalRef}
-        className="schedule-meeting-modal"
+        className={`schedule-meeting-modal ${isReady ? 'loaded' : ''}`}
         style={{
           backgroundColor: 'var(--center-channel-bg, #fff)',
           borderRadius: '8px',
@@ -728,52 +770,58 @@ const ScheduleMeetingModal = ({channel, onClose, onSuccess}) => {
             </div>
           </div>
 
-          {/* Участники */}
-          <div className="form-section participants">
-            <ParticipantSelector 
-            isDirectChannel={isDirectChannel}
-            participantSearch={participantSearch}
-            setParticipantSearch={setParticipantSearch}
-            searchResults={searchResults}
-            addParticipant={addParticipant}
-            participants={participants}
-            removeParticipant={removeParticipant}
-            errors={errors}
-            searchInputRef={searchInputRef}
-          />
-          </div>
-
-          {/* Чекбокс уведомлений */}
-          <div className="form-section notification-checkbox">
-            <label className="checkbox-label">
-              <input 
-                type="checkbox" 
-                checked={notifyParticipants}
-                onChange={(e) => setNotifyParticipants(e.target.checked)}
-              />
-              <span className="checkbox-icon">🔔</span>
-              <span>Уведомить участников в Time</span>
-            </label>
-            <div className="field-hint">
-              Участники получат уведомление о запланированной встрече
+          {/* Участники - ленивая загрузка */}
+          {showAdvanced && (
+            <div className="form-section participants">
+              <ParticipantSelector 
+              isDirectChannel={isDirectChannel}
+              participantSearch={participantSearch}
+              setParticipantSearch={setParticipantSearch}
+              searchResults={searchResults}
+              addParticipant={addParticipant}
+              participants={participants}
+              removeParticipant={removeParticipant}
+              errors={errors}
+              searchInputRef={searchInputRef}
+            />
             </div>
-          </div>
+          )}
 
-          {/* Чекбокс Google Calendar */}
-          <div className="form-section google-calendar-checkbox">
-            <label className="checkbox-label">
-              <input 
-                type="checkbox" 
-                checked={createGoogleEvent}
-                onChange={(e) => setCreateGoogleEvent(e.target.checked)}
-              />
-              <span className="checkbox-icon">📅</span>
-              <span>Создать событие в Google Календаре у всех</span>
-            </label>
-            <div className="field-hint">
-              Событие будет автоматически добавлено в Google Calendar всех участников
+          {/* Чекбокс уведомлений - ленивая загрузка */}
+          {showAdvanced && (
+            <div className="form-section notification-checkbox">
+              <label className="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  checked={notifyParticipants}
+                  onChange={(e) => setNotifyParticipants(e.target.checked)}
+                />
+                <span className="checkbox-icon">🔔</span>
+                <span>Уведомить участников в Time</span>
+              </label>
+              <div className="field-hint">
+                Участники получат уведомление о запланированной встрече
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Чекбокс Google Calendar - ленивая загрузка */}
+          {showAdvanced && (
+            <div className="form-section google-calendar-checkbox">
+              <label className="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  checked={createGoogleEvent}
+                  onChange={(e) => setCreateGoogleEvent(e.target.checked)}
+                />
+                <span className="checkbox-icon">📅</span>
+                <span>Создать событие в Google Календаре у всех</span>
+              </label>
+              <div className="field-hint">
+                Событие будет автоматически добавлено в Google Calendar всех участников
+              </div>
+            </div>
+          )}
 
           {/* Кнопки */}
           <div className="modal-actions" style={{

@@ -5,11 +5,11 @@
 @keyframes modal-slide-in {
   from {
     opacity: 0;
-    transform: translateY(-30px) scale(0.96);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
@@ -35,7 +35,7 @@
 @keyframes section-fade-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -46,11 +46,9 @@
 @keyframes hint-fade-in {
   from {
     opacity: 0;
-    transform: translateY(-4px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -60,12 +58,13 @@
    ========================================== */
 
 .schedule-meeting-modal {
-  animation: modal-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  /* Упрощённая анимация - только transform и opacity (GPU-accelerated) */
+  animation: modal-slide-in 0.2s ease;
 }
 
 .schedule-meeting-modal-backdrop {
-  backdrop-filter: blur(4px);
-  background-color: rgba(0, 0, 0, 0.6) !important;
+  /* Убрали backdrop-filter - тяжёлая операция для Electron */
+  background-color: rgba(0, 0, 0, 0.65) !important;
   animation: backdrop-fade-in 0.2s ease-out;
 }
 
@@ -99,14 +98,20 @@
 
 .schedule-meeting-modal .form-section {
   margin-bottom: 24px;
-  animation: section-fade-in 0.4s ease backwards;
+  /* Упростили анимации секций для лучшей производительности в Electron */
+  /* Анимации секций будут включаться через JS после монтирования */
 }
 
-.schedule-meeting-modal .form-section:nth-child(1) { animation-delay: 0.05s; }
-.schedule-meeting-modal .form-section:nth-child(2) { animation-delay: 0.1s; }
-.schedule-meeting-modal .form-section:nth-child(3) { animation-delay: 0.15s; }
-.schedule-meeting-modal .form-section:nth-child(4) { animation-delay: 0.2s; }
-.schedule-meeting-modal .form-section:nth-child(5) { animation-delay: 0.25s; }
+/* Анимации секций отключены по умолчанию для быстрого открытия */
+.schedule-meeting-modal.loaded .form-section {
+  animation: section-fade-in 0.3s ease backwards;
+}
+
+.schedule-meeting-modal.loaded .form-section:nth-child(1) { animation-delay: 0.05s; }
+.schedule-meeting-modal.loaded .form-section:nth-child(2) { animation-delay: 0.1s; }
+.schedule-meeting-modal.loaded .form-section:nth-child(3) { animation-delay: 0.15s; }
+.schedule-meeting-modal.loaded .form-section:nth-child(4) { animation-delay: 0.15s; }
+.schedule-meeting-modal.loaded .form-section:nth-child(5) { animation-delay: 0.2s; }
 
 /* Label с иконкой */
 .schedule-meeting-modal .form-section label {
