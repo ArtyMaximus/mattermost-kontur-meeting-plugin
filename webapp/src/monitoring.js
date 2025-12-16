@@ -118,3 +118,5 @@ export class ErrorMonitor {
 // Глобальный экземпляр
 export const errorMonitor = new ErrorMonitor();
 
+
+
