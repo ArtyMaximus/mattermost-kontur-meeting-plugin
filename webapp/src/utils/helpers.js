@@ -19,24 +19,30 @@ export const formatWebhookError = (config) => {
  */
 export const formatErrorMessage = (error, config) => {
   const errorText = error.message || '';
-  
+
   // Check for detailed webhook error from server
   if (errorText.includes('🔌 Не удалось подключиться к вебхуку')) {
     return errorText;
   }
-  
+
   // Check for connection errors
-  if (errorText.includes('Не удалось подключиться к вебхуку') || 
-      errorText.includes('Failed to fetch') || 
+  if (errorText.includes('Не удалось подключиться к вебхуку') ||
+      errorText.includes('Failed to fetch') ||
       errorText.includes('ERR_CONNECTION_REFUSED')) {
     return formatWebhookError(config);
   }
-  
-  // Check for webhook errors
-  if (errorText.includes('Вебхук вернул ошибку')) {
+
+  // Check for webhook errors - if message already contains detailed error, return it as is
+  if (errorText.includes('Вебхук вернул ошибку') && !errorText.includes('❌')) {
+    // Generic webhook error without details
     return '❌ Не удалось создать встречу.\n\n⚠️ Вебхук вернул ошибку. Проверьте логи workflow в n8n.';
   }
-  
+
+  // If error message already starts with ❌ or contains detailed info from n8n, return as is
+  if (errorText.startsWith('❌') || errorText.includes('Что-то пошло не так')) {
+    return errorText;
+  }
+
   // Default error message
   return '❌ Не удалось создать встречу.\n\n' + errorText;
 };
@@ -49,23 +55,16 @@ export const getCurrentUserInfo = (channel) => {
     const state = window.KonturMeetingPlugin.store.getState();
     const currentUserId = state.entities.users.currentUserId;
     const currentTeamId = state.entities.teams.currentTeamId;
-    
+
     return {
       user_id: currentUserId,
       team_id: currentTeamId || channel.team_id || ''
     };
   }
-  
+
   // Fallback
   return {
     user_id: '',
     team_id: channel.team_id || ''
   };
 };
-
-
-
-
-
-
-

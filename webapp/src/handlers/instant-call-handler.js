@@ -23,7 +23,7 @@ function convertToMSK(date = new Date()) {
     second: '2-digit',
     hour12: false
   });
-  
+
   const parts = formatter.formatToParts(date);
   const year = parts.find(p => p.type === 'year').value;
   const month = parts.find(p => p.type === 'month').value;
@@ -31,7 +31,7 @@ function convertToMSK(date = new Date()) {
   const hours = parts.find(p => p.type === 'hour').value;
   const minutes = parts.find(p => p.type === 'minute').value;
   const seconds = parts.find(p => p.type === 'second').value;
-  
+
   // Format as RFC3339 with +03:00 offset (MSK is always UTC+3)
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}+03:00`;
 }
@@ -47,7 +47,7 @@ function convertToMSK(date = new Date()) {
  */
 export async function handleInstantCall(channel, pluginCore, context = {}) {
   const { postId, rootId } = context;
-  
+
   logger.debug('Создание мгновенной встречи:', {
     channel: channel.display_name || channel.name,
     channelId: channel.id,
@@ -84,7 +84,7 @@ export async function handleInstantCall(channel, pluginCore, context = {}) {
 
     // Get current time
     const now = new Date();
-    
+
     // Prepare webhook payload
     const webhookPayload = {
       operation_type: 'instant_call',  // Тип операции: быстрый созвон
@@ -115,13 +115,35 @@ export async function handleInstantCall(channel, pluginCore, context = {}) {
     });
 
     if (!webhookResponse.ok) {
-      throw new Error(`Вебхук вернул ошибку: ${webhookResponse.status} ${webhookResponse.statusText}`);
+      // Try to parse error response from webhook
+      let errorMessage = `Вебхук вернул ошибку: ${webhookResponse.status} ${webhookResponse.statusText}`;
+
+      try {
+        const responseText = await webhookResponse.text();
+        if (responseText) {
+          const errorData = JSON.parse(responseText);
+
+          // Check for structured n8n error response
+          if (errorData.status === 'error' && errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        }
+      } catch (parseError) {
+        // If parsing fails, use default error message
+        logger.warn('[Meeting] Не удалось распарсить ошибку от вебхука', parseError);
+      }
+
+      throw new Error(errorMessage);
     }
 
     // Safely parse response - handle empty body
     let webhookData = null;
     const responseText = await webhookResponse.text();
-    
+
     if (responseText) {
       try {
         webhookData = JSON.parse(responseText);
@@ -143,7 +165,7 @@ export async function handleInstantCall(channel, pluginCore, context = {}) {
 
     // Check if meeting_url or room_url is present in response
     const roomUrl = webhookData?.meeting_url || webhookData?.room_url;
-    
+
     if (!roomUrl) {
       // Если нет URL, но есть success: true, просто показываем сообщение
       if (webhookData?.success) {
@@ -173,10 +195,9 @@ export async function handleInstantCall(channel, pluginCore, context = {}) {
       message: error.message,
       stack: error.stack
     });
-    
+
     // Use common error formatter from helpers
     const errorMessage = formatErrorMessage(error, pluginCore.config);
     alert(errorMessage);
   }
 }
-
