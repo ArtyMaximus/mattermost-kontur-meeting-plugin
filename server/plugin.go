@@ -33,7 +33,7 @@ func (p *Plugin) OnActivate() error {
 	}()
 
 	p.API.LogInfo("Kontur.Talk Meeting plugin activated")
-	
+
 	// Check that configuration is valid
 	config := p.getConfiguration()
 	if config.WebhookURL == "" {
@@ -41,7 +41,7 @@ func (p *Plugin) OnActivate() error {
 	} else {
 		p.API.LogDebug("Plugin configured", "webhook_url", config.WebhookURL)
 	}
-	
+
 	return nil
 }
 
@@ -113,7 +113,7 @@ func (p *Plugin) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Set response headers
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	// Return configuration as JSON with snake_case keys
 	response := map[string]interface{}{
 		"webhook_url":     config.WebhookURL,
@@ -160,7 +160,7 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 				p.API.LogError("[Kontur] Panic recovered", "panic", fmt.Sprintf("%v", rec))
 			}
 			if w.Header().Get("Content-Type") == "" {
-				writeErrorResponse(w, http.StatusInternalServerError, "general", 
+				writeErrorResponse(w, http.StatusInternalServerError, "general",
 					fmt.Sprintf("Внутренняя ошибка сервера: %v", rec))
 			}
 		}
@@ -231,30 +231,30 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 		if webhookErr, ok := IsWebhookError(err); ok {
 			// Log with execution_id for debugging
 			if webhookErr.ExecutionID != "" {
-				p.API.LogError("[Kontur] Webhook returned error from n8n", 
+				p.API.LogError("[Kontur] Webhook returned error from n8n",
 					"error", webhookErr.Message,
 					"execution_id", webhookErr.ExecutionID,
 					"status_code", webhookErr.StatusCode)
 			} else {
-				p.API.LogError("[Kontur] Webhook returned error from n8n", 
+				p.API.LogError("[Kontur] Webhook returned error from n8n",
 					"error", webhookErr.Message,
 					"status_code", webhookErr.StatusCode)
 			}
-			
+
 			// Return n8n error message to user
 			// Use the status code from n8n, but default to 400 if it's not a client error
 			statusCode := webhookErr.StatusCode
 			if statusCode < 400 || statusCode >= 500 {
 				statusCode = http.StatusBadRequest
 			}
-			
+
 			writeErrorResponse(w, statusCode, RequestFieldGeneral, webhookErr.Message)
 			return
 		}
-		
+
 		// Network or other non-n8n errors
 		p.API.LogError("[Kontur] Webhook request failed", "error", err.Error())
-		
+
 		// Detailed error message for webhook failures
 		errorMsg := "Не удалось создать встречу.\n\n"
 		errorMsg += "🔌 Не удалось подключиться к вебхуку:\n"
@@ -263,7 +263,7 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 		errorMsg += "1. n8n запущен и доступен\n"
 		errorMsg += "2. Workflow активирован\n"
 		errorMsg += "3. URL указан правильно"
-		
+
 		writeErrorResponse(w, http.StatusInternalServerError, RequestFieldGeneral, errorMsg)
 		return
 	}
@@ -279,13 +279,13 @@ func (p *Plugin) handleScheduleMeeting(w http.ResponseWriter, r *http.Request) {
 	// Step 7.5: Validate room URL - don't create post without it
 	if roomURL == "" {
 		p.API.LogWarn("[Kontur] room_url пустой, пост не будет создан", "webhook_response", fmt.Sprintf("%+v", webhookData))
-		writeErrorResponse(w, http.StatusBadGateway, RequestFieldGeneral, 
+		writeErrorResponse(w, http.StatusBadGateway, RequestFieldGeneral,
 			"Вебхук не вернул ссылку на комнату. Встреча не была создана.")
 		return
 	}
 
 	// Step 8: Create post in channel or thread
-	if err := p.createPost(channel, currentUser, participants, scheduledAt, req.DurationMinutes, roomURL, req.RootID); err != nil {
+	if err := p.createPost(channel, currentUser, participants, scheduledAt, req.DurationMinutes, roomURL, req.RootID, req); err != nil {
 		// Don't fail the request if post creation fails (meeting is already created)
 		p.API.LogWarn("[Kontur] Failed to create post, but meeting was created", "error", err.Error())
 	}
