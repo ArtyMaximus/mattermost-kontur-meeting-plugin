@@ -34,8 +34,8 @@ type ScheduleRequest struct {
 	ChannelID              string   `json:"channel_id"`
 	TeamID                 string   `json:"team_id"`
 	UserID                 string   `json:"user_id"`
-	StartAt                string   `json:"start_at"`
-	StartAtLocal           string   `json:"start_at_local"`
+	StartAt                string   `json:"start_at"`                // Старое поле для обратной совместимости
+	StartAtLocal           string   `json:"start_at_local"`         // Старое поле для обратной совместимости
 	Timezone               string   `json:"timezone"`
 	DurationMinutes        int      `json:"duration_minutes"`
 	Title                  *string  `json:"title"`
@@ -44,6 +44,13 @@ type ScheduleRequest struct {
 	CreateGoogleCalendarEvent bool   `json:"create_google_calendar_event"`
 	ServiceName            string   `json:"service_name"`
 	RootID                 string   `json:"root_id"` // ID родительского сообщения для создания поста в треде
+	// Новые поля с правильной обработкой таймзон
+	StartTimeClient        string   `json:"start_time_client"`
+	EndTimeClient          string   `json:"end_time_client"`
+	StartTimeUTC           string   `json:"start_time_utc"`
+	EndTimeUTC             string   `json:"end_time_utc"`
+	StartTimeMSK           string   `json:"start_time_msk"`
+	EndTimeMSK             string   `json:"end_time_msk"`
 }
 
 // validateScheduleRequest validates and parses the incoming request
@@ -72,6 +79,18 @@ func (p *Plugin) validateScheduleRequest(w http.ResponseWriter, r *http.Request)
 		RequestFieldStartAtLocal, req.StartAtLocal,
 		"duration_minutes", req.DurationMinutes,
 		"participant_count", len(req.ParticipantIDs))
+
+	// Логирование временных полей для отладки
+	if req.StartTimeClient != "" {
+		p.API.LogDebug("[Kontur] Time fields received",
+			"timezone", req.Timezone,
+			"start_time_client", req.StartTimeClient,
+			"end_time_client", req.EndTimeClient,
+			"start_time_utc", req.StartTimeUTC,
+			"end_time_utc", req.EndTimeUTC,
+			"start_time_msk", req.StartTimeMSK,
+			"end_time_msk", req.EndTimeMSK)
+	}
 
 	// Validate required fields
 	errors := []map[string]string{}
@@ -303,13 +322,41 @@ func (p *Plugin) buildWebhookPayload(req *ScheduleRequest, currentUser *model.Us
 		}
 	}
 
+	// Используем новые поля из запроса, если они есть, иначе вычисляем из scheduledAt (обратная совместимость)
+	var startTimeUTCStr, endTimeUTCStr, startTimeMSKStr, endTimeMSKStr string
+	var startTimeClientStr, endTimeClientStr string
+
+	if req.StartTimeUTC != "" && req.EndTimeUTC != "" && req.StartTimeMSK != "" && req.EndTimeMSK != "" {
+		// Используем новые поля из фронтенда (правильно вычисленные)
+		startTimeUTCStr = req.StartTimeUTC
+		endTimeUTCStr = req.EndTimeUTC
+		startTimeMSKStr = req.StartTimeMSK
+		endTimeMSKStr = req.EndTimeMSK
+		startTimeClientStr = req.StartTimeClient
+		endTimeClientStr = req.EndTimeClient
+		if req.Timezone != "" {
+			timezone = req.Timezone
+		}
+		p.API.LogDebug("[Kontur] Using new time fields from request")
+	} else {
+		// Обратная совместимость: вычисляем из scheduledAt
+		startTimeUTCStr = scheduledAt.UTC().Format(time.RFC3339)
+		endTimeUTCStr = endTime.UTC().Format(time.RFC3339)
+		startTimeMSKStr = convertToMSK(scheduledAt)
+		endTimeMSKStr = convertToMSK(endTime)
+		p.API.LogDebug("[Kontur] Using computed time fields (legacy mode)")
+	}
+
 	payload := map[string]interface{}{
 		"operation_type":     "scheduled_meeting",
 		"service_name":       serviceName,
-		"start_time_utc":     scheduledAt.UTC().Format(time.RFC3339),
-		"end_time_utc":       endTime.UTC().Format(time.RFC3339),
-		"start_time_msk":     convertToMSK(scheduledAt),
-		"end_time_msk":       convertToMSK(endTime),
+		// Новые поля (приоритет)
+		"start_time_client":  startTimeClientStr,
+		"end_time_client":    endTimeClientStr,
+		"start_time_utc":     startTimeUTCStr,
+		"end_time_utc":       endTimeUTCStr,
+		"start_time_msk":     startTimeMSKStr,
+		"end_time_msk":       endTimeMSKStr,
 		"timezone":           timezone,
 		"duration_minutes":   req.DurationMinutes,
 		"title":              meetingTitle,
@@ -382,22 +429,22 @@ func (p *Plugin) sendWebhook(webhookURL string, payload map[string]interface{}) 
 			webhookErr := &WebhookError{
 				StatusCode: resp.StatusCode,
 			}
-			
+
 			// Extract message
 			if msg, ok := webhookData["message"].(string); ok && msg != "" {
 				webhookErr.Message = msg
 			} else {
 				webhookErr.Message = fmt.Sprintf("Ошибка при создании встречи (статус %d)", resp.StatusCode)
 			}
-			
+
 			// Extract execution_id
 			if execID, ok := webhookData["execution_id"].(string); ok && execID != "" {
 				webhookErr.ExecutionID = execID
 			}
-			
+
 			return nil, webhookErr
 		}
-		
+
 		// Fallback to legacy error format
 		errorMsg := fmt.Sprintf("webhook returned error (status %d)", resp.StatusCode)
 		if msg, ok := webhookData["message"].(string); ok && msg != "" {
@@ -435,7 +482,7 @@ func (p *Plugin) sendWebhook(webhookURL string, payload map[string]interface{}) 
 }
 
 // createPost creates a post in the channel or thread
-func (p *Plugin) createPost(channel *model.Channel, currentUser *model.User, participants []*model.User, scheduledAt time.Time, duration int, roomURL string, rootID string) error {
+func (p *Plugin) createPost(channel *model.Channel, currentUser *model.User, participants []*model.User, scheduledAt time.Time, duration int, roomURL string, rootID string, req *ScheduleRequest) error {
 	// Format participants list
 	participantsList := ""
 	for i, user := range participants {
@@ -445,8 +492,29 @@ func (p *Plugin) createPost(channel *model.Channel, currentUser *model.User, par
 		participantsList += "@" + user.Username
 	}
 
-	// Format scheduled time
-	scheduledAtFormatted := scheduledAt.Format("02.01.2006, 15:04") + " (по МСК)"
+	// Format scheduled time in MSK
+	var scheduledAtFormatted string
+
+	// Primary source: new start_time_msk field from request (already calculated on frontend)
+	if req != nil && req.StartTimeMSK != "" {
+		if mskTime, err := time.Parse(time.RFC3339, req.StartTimeMSK); err == nil {
+			scheduledAtFormatted = mskTime.Format("02.01.2006, 15:04") + " (по МСК)"
+		} else {
+			p.API.LogWarn("[Kontur] Failed to parse start_time_msk, falling back to legacy time",
+				"start_time_msk", req.StartTimeMSK, "error", err.Error())
+		}
+	}
+
+	// Fallback for legacy clients: convert scheduledAt to MSK before formatting
+	if scheduledAtFormatted == "" {
+		mskLocation, err := time.LoadLocation("Europe/Moscow")
+		if err != nil {
+			// Fallback to UTC+3 if location loading fails
+			mskLocation = time.FixedZone("MSK", 3*60*60)
+		}
+		scheduledAtMSK := scheduledAt.In(mskLocation)
+		scheduledAtFormatted = scheduledAtMSK.Format("02.01.2006, 15:04") + " (по МСК)"
+	}
 
 	// Create message
 	postMessage := fmt.Sprintf("📅 @%s запланировал встречу на %s\n\n", currentUser.Username, scheduledAtFormatted)
@@ -467,7 +535,7 @@ func (p *Plugin) createPost(channel *model.Channel, currentUser *model.User, par
 		// Валидация: проверяем, что rootID существует и в том же канале
 		rootPost, appErr := p.API.GetPost(rootID)
 		if appErr != nil || rootPost == nil {
-			p.API.LogWarn("[Kontur] Root post not found, creating in channel root", 
+			p.API.LogWarn("[Kontur] Root post not found, creating in channel root",
 				"root_id", rootID)
 			// Создаём в корне канала, если rootID невалиден
 		} else if rootPost.ChannelId != channel.Id {
@@ -488,4 +556,3 @@ func (p *Plugin) createPost(channel *model.Channel, currentUser *model.User, par
 	p.API.LogDebug("[Kontur] Post created successfully", "root_id", rootID)
 	return nil
 }
-

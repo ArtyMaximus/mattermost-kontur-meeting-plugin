@@ -68,3 +68,4 @@ mattermost-config.json
 # Documentation files (except README.md)
 *.md
 !README.md
+clear-cursor-cache.ps1

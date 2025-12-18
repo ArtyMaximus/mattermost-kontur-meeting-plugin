@@ -7,8 +7,8 @@ import { formatErrorMessage, getCurrentUserInfo } from '../utils/helpers.js';
 import { DEFAULT_TIMEZONE, REQUEST_FIELDS, ERROR_FIELD_MAP } from '../utils/constants.js';
 import { logger } from '../utils/logger.js';
 import ErrorBoundary from './error_boundary.jsx';
-import { 
-  DurationSelector, 
+import {
+  DurationSelector,
   ParticipantSelector,
   TimeSelector,
   TimePresets
@@ -18,14 +18,14 @@ import './schedule-meeting-modal.css';
 const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => {
   // Определяем, является ли канал директом (DM)
   const isDirectChannel = channel && channel.type === 'D';
-  
+
   // Определяем источник открытия модалки (Post Action vs кнопка в шапке)
   const isFromThread = Boolean(rootId || postId);
-  
+
   // Состояние для ленивой загрузки секций
   const [isReady, setIsReady] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  
+
   // Разделяем дату и время на отдельные состояния
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedHour, setSelectedHour] = useState('');
@@ -44,7 +44,8 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
   const [selectedQuick, setSelectedQuick] = useState(null);
   const [notifyParticipants, setNotifyParticipants] = useState(true);
   const [createGoogleEvent, setCreateGoogleEvent] = useState(true);
-  
+  const [mouseDownOutside, setMouseDownOutside] = useState(false);
+
   const modalRef = useRef(null);
   const searchInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
@@ -70,6 +71,31 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
     setIsReady(false);
   };
 
+  // Обработчики кликов по фону модального окна (backdrop)
+  const handleBackdropMouseDown = (e) => {
+    // Считаем клик "вне модалки" только если событие произошло на самом backdrop
+    if (e.target === e.currentTarget) {
+      setMouseDownOutside(true);
+    } else {
+      setMouseDownOutside(false);
+    }
+  };
+
+  const handleBackdropMouseUp = (e) => {
+    // Закрываем модалку только если и mousedown, и mouseup были на backdrop
+    if (e.target === e.currentTarget && mouseDownOutside) {
+      resetForm();
+      onClose();
+    }
+    // В любом случае сбрасываем флаг
+    setMouseDownOutside(false);
+  };
+
+  const handleBackdropMouseLeave = () => {
+    // Если мышь ушла с backdrop с зажатой кнопкой — не считаем это кликом по фону
+    setMouseDownOutside(false);
+  };
+
   // Оптимизация: отложенная инициализация для быстрого открытия модалки
   useEffect(() => {
     // Показываем модалку сразу, загружаем остальное асинхронно
@@ -79,7 +105,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
       if (modalRef.current) {
         modalRef.current.classList.add('loaded');
       }
-      
+
       // Показываем продвинутые секции через небольшую задержку
       setTimeout(() => {
         setShowAdvanced(true);
@@ -87,21 +113,6 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
     });
   }, []);
 
-  // Закрытие при клике вне модального окна (по фону)
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Закрывать только если клик по фону (не по содержимому модалки)
-      if (modalRef.current && !modalRef.current.contains(event.target)) {
-        resetForm();
-        onClose();
-      }
-    };
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [onClose, channel]);
 
   // Закрытие по Escape
   useEffect(() => {
@@ -111,7 +122,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
         onClose();
       }
     };
-    
+
     document.addEventListener('keydown', handleEscape);
     return () => {
       document.removeEventListener('keydown', handleEscape);
@@ -151,7 +162,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
           if (response.ok) {
             const users = await response.json();
             // Исключить уже выбранных участников
-            const filtered = users.filter(user => 
+            const filtered = users.filter(user =>
               !participants.some(p => p.id === user.id)
             );
             setSearchResults(filtered);
@@ -207,32 +218,124 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
     setParticipants(participants.filter(p => p.id !== userId));
   };
 
-  // Функция для формирования дат (start_at и start_at_local)
-  const buildDateTimeStrings = (date, hour, minute) => {
+  // Новая функция: единый источник правды для времени с учетом таймзоны пользователя
+  const buildDateTimeInfo = (date, hour, minute, durationMinutes) => {
     if (!date || hour === '' || minute === '') {
-      return { startAtUTC: null, startAtLocal: null };
+      return {
+        startAtUTC: null,
+        startAtLocal: null,
+        start_time_client: null,
+        end_time_client: null,
+        start_time_utc: null,
+        end_time_utc: null,
+        start_time_msk: null,
+        end_time_msk: null,
+        timezone: null
+      };
     }
 
     const hours = parseInt(hour, 10);
     const minutes = parseInt(minute, 10);
-    const startAtDate = new Date(date);
-    startAtDate.setHours(hours, minutes, 0, 0);
-    
-    // Формируем строку в формате YYYY-MM-DDTHH:mm:ss+03:00 без перевода в UTC
-    // MSK = UTC+3, поэтому используем +03:00
-    const year = startAtDate.getFullYear();
-    const month = String(startAtDate.getMonth() + 1).padStart(2, '0');
-    const day = String(startAtDate.getDate()).padStart(2, '0');
+    const duration = parseInt(durationMinutes, 10) || 60;
+
+    // 1. Локальное время пользователя (Date в его таймзоне)
+    const localStart = new Date(date);
+    localStart.setHours(hours, minutes, 0, 0);
+
+    const localEnd = new Date(localStart.getTime() + duration * 60 * 1000);
+
+    // 2. Таймзона пользователя (IANA)
+    const clientTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // Вспомогательная функция для формирования строки с офсетом клиента
+    const formatWithClientOffset = (d) => {
+      const tzOffsetMin = d.getTimezoneOffset(); // в минутах, для +05:00 будет -300
+      const offsetAbs = Math.abs(tzOffsetMin);
+      const offsetSign = tzOffsetMin <= 0 ? '+' : '-';
+      const offsetHours = String(Math.floor(offsetAbs / 60)).padStart(2, '0');
+      const offsetMinutes = String(offsetAbs % 60).padStart(2, '0');
+      const offsetStr = `${offsetSign}${offsetHours}:${offsetMinutes}`;
+
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+
+      return {
+        iso: `${y}-${m}-${dd}T${hh}:${mm}:00${offsetStr}`,
+        offsetStr,
+        tzOffsetMin,
+      };
+    };
+
+    const startClient = formatWithClientOffset(localStart);
+    const endClient = formatWithClientOffset(localEnd);
+
+    // 3. UTC время
+    const startUtcISO = localStart.toISOString(); // 2025-12-17T14:30:00.000Z
+    const endUtcISO = localEnd.toISOString();
+
+    // 4. Время в МСК (Europe/Moscow) - правильная конвертация через Intl API
+    const formatMsk = (utcDateStr) => {
+      const utcDate = new Date(utcDateStr);
+      // Используем Intl.DateTimeFormat для правильной конвертации в МСК
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Moscow',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+
+      const parts = formatter.formatToParts(utcDate);
+      const year = parts.find(p => p.type === 'year').value;
+      const month = parts.find(p => p.type === 'month').value;
+      const day = parts.find(p => p.type === 'day').value;
+      const hours = parts.find(p => p.type === 'hour').value;
+      const minutes = parts.find(p => p.type === 'minute').value;
+
+      // МСК всегда UTC+3 (с 2014 года)
+      return `${year}-${month}-${day}T${hours}:${minutes}:00+03:00`;
+    };
+
+    const startMsk = formatMsk(startUtcISO);
+    const endMsk = formatMsk(endUtcISO);
+
+    logger.debug('[Kontur] Time calculation', {
+      clientTimeZone,
+      start_time_client: startClient.iso,
+      end_time_client: endClient.iso,
+      start_time_utc: startUtcISO,
+      end_time_utc: endUtcISO,
+      start_time_msk: startMsk,
+      end_time_msk: endMsk,
+    });
+
+    // Для обратной совместимости сохраняем старые поля
+    const year = localStart.getFullYear();
+    const month = String(localStart.getMonth() + 1).padStart(2, '0');
+    const day = String(localStart.getDate()).padStart(2, '0');
     const hoursStr = String(hours).padStart(2, '0');
     const minutesStr = String(minutes).padStart(2, '0');
-    
-    // Локальное время в формате MSK (+03:00)
     const startAtLocal = `${year}-${month}-${day}T${hoursStr}:${minutesStr}:00+03:00`;
-    
-    // Также отправляем UTC для обратной совместимости
-    const startAtUTC = startAtDate.toISOString();
-    
-    return { startAtUTC, startAtLocal };
+
+    return {
+      // Новые поля
+      start_time_client: startClient.iso,
+      end_time_client: endClient.iso,
+      start_time_utc: startUtcISO,
+      end_time_utc: endUtcISO,
+      start_time_msk: startMsk,
+      end_time_msk: endMsk,
+      timezone: clientTimeZone,
+      // Старые поля для обратной совместимости
+      startAtUTC: startUtcISO,
+      startAtLocal: startAtLocal,
+    };
   };
 
   // Валидация формы
@@ -246,7 +349,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
       now.setHours(0, 0, 0, 0);
       const selectedDateOnly = new Date(selectedDate);
       selectedDateOnly.setHours(0, 0, 0, 0);
-      
+
       if (selectedDateOnly < now) {
         newErrors.meetingDatetime = 'Дата не может быть в прошлом';
       }
@@ -264,13 +367,13 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const selectedDateOnly = new Date(selectedDate);
       selectedDateOnly.setHours(0, 0, 0, 0);
-      
+
       if (selectedDateOnly.getTime() === today.getTime()) {
         const hours = parseInt(selectedHour, 10);
         const minutes = parseInt(selectedMinute, 10);
         const selectedDateTime = new Date(selectedDate);
         selectedDateTime.setHours(hours, minutes, 0, 0);
-        
+
         if (selectedDateTime < now) {
           newErrors.meetingTime = 'Время не может быть в прошлом';
         }
@@ -302,8 +405,8 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
   // Helper function to build request payload
   const buildScheduleRequest = () => {
     const userInfo = getUserInfo();
-    const { startAtUTC, startAtLocal } = buildDateTimeStrings(selectedDate, selectedHour, selectedMinute);
-    
+    const timeInfo = buildDateTimeInfo(selectedDate, selectedHour, selectedMinute, duration);
+
     // Get service name from config
     const config = window.KonturMeetingPlugin && window.KonturMeetingPlugin.config;
     const serviceName = config?.ServiceName || '';
@@ -312,9 +415,18 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
       [REQUEST_FIELDS.CHANNEL_ID]: channel.id,
       [REQUEST_FIELDS.TEAM_ID]: userInfo.team_id,
       [REQUEST_FIELDS.USER_ID]: userInfo.user_id,
-      [REQUEST_FIELDS.START_AT]: startAtUTC,
-      [REQUEST_FIELDS.START_AT_LOCAL]: startAtLocal,
-      [REQUEST_FIELDS.TIMEZONE]: DEFAULT_TIMEZONE,
+      // Новые поля с правильной обработкой таймзон
+      start_time_client: timeInfo.start_time_client,
+      end_time_client: timeInfo.end_time_client,
+      start_time_utc: timeInfo.start_time_utc,
+      end_time_utc: timeInfo.end_time_utc,
+      start_time_msk: timeInfo.start_time_msk,
+      end_time_msk: timeInfo.end_time_msk,
+      timezone: timeInfo.timezone,
+      // Старые поля для обратной совместимости
+      [REQUEST_FIELDS.START_AT]: timeInfo.startAtUTC,
+      [REQUEST_FIELDS.START_AT_LOCAL]: timeInfo.startAtLocal,
+      [REQUEST_FIELDS.TIMEZONE]: timeInfo.timezone || DEFAULT_TIMEZONE,
       [REQUEST_FIELDS.DURATION_MINUTES]: parseInt(duration, 10),
       [REQUEST_FIELDS.TITLE]: meetingTitle.trim() || null,
       [REQUEST_FIELDS.PARTICIPANT_IDS]: participants.map(p => p.id),
@@ -322,13 +434,13 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
       create_google_calendar_event: createGoogleEvent,
       service_name: serviceName
     };
-    
+
     // Добавляем root_id если модалка открыта из Post Action (тред)
     if (rootId) {
       requestBody.root_id = rootId;
       logger.debug('Добавлен root_id в запрос', { rootId, postId });
     }
-    
+
     return requestBody;
   };
 
@@ -350,11 +462,11 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
     if (result.errors && Array.isArray(result.errors)) {
       const validationErrors = {};
       let generalError = null;
-      
+
           result.errors.forEach(error => {
             if (error.field) {
               const mappedField = ERROR_FIELD_MAP[error.field] || error.field;
-          
+
           if (mappedField === 'general') {
             generalError = error.message;
           } else {
@@ -362,21 +474,21 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
           }
         }
       });
-      
+
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
         return;
       }
-      
+
       if (generalError) {
         throw new Error(generalError);
       }
     }
-    
+
     if (result.message) {
       throw new Error(result.message);
     }
-    
+
     throw new Error(`Не удалось создать встречу (статус ${response.status})`);
   };
 
@@ -411,7 +523,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
           status: response.status,
           statusText: response.statusText
         });
-        
+
         await handleApiError(response);
         setIsLoading(false);
         return;
@@ -419,14 +531,14 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
 
       // Success
       logger.debug('Meeting scheduled successfully');
-      
+
       setIsLoading(false);
       setIsSuccess(true);
-      
+
       if (onSuccess) {
         onSuccess();
       }
-      
+
       setTimeout(() => {
         resetForm();
         onClose();
@@ -434,7 +546,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
 
     } catch (error) {
       logger.error('Ошибка при создании встречи:', error);
-      
+
       setIsLoading(false);
       const config = window.KonturMeetingPlugin && window.KonturMeetingPlugin.config;
       const errorMessage = formatErrorMessage(error, config);
@@ -532,7 +644,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
     // Объединяем обновления времени в один setState через функцию
     setSelectedHour(targetHour);
     setSelectedMinute(targetMinute);
-    
+
     // Очистить ошибки - оптимизировано (один setState)
     if (errors.meetingTime || (errors.meetingDatetime && targetDate)) {
       const newErrors = {...errors};
@@ -565,11 +677,11 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
         setShowCalendar(false);
       }
     };
-    
+
     if (showCalendar) {
       document.addEventListener('mousedown', handleClickOutside);
     }
-    
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
@@ -578,6 +690,31 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
   // Get service name from config
   const config = window.KonturMeetingPlugin && window.KonturMeetingPlugin.config;
   const serviceName = config?.ServiceName || '';
+
+  // Получаем информацию о таймзоне пользователя
+  const getTimezoneInfo = () => {
+    try {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const now = new Date();
+      const offsetMinutes = now.getTimezoneOffset(); // отрицательное для UTC+
+      const offsetHours = Math.abs(Math.floor(offsetMinutes / 60));
+      const offsetMins = Math.abs(offsetMinutes % 60);
+      const offsetSign = offsetMinutes <= 0 ? '+' : '-';
+      const offsetStr = `UTC${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMins).padStart(2, '0')}`;
+      return {
+        timeZone,
+        offsetStr
+      };
+    } catch (error) {
+      logger.error('Failed to get timezone info', error);
+      return {
+        timeZone: 'Unknown',
+        offsetStr: 'UTC+00:00'
+      };
+    }
+  };
+
+  const timezoneInfo = getTimezoneInfo();
 
   return (
     <ErrorBoundary>
@@ -595,7 +732,9 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
         justifyContent: 'center',
         zIndex: 10000
       }}
-      onClick={onClose}
+      onMouseDown={handleBackdropMouseDown}
+      onMouseUp={handleBackdropMouseUp}
+      onMouseLeave={handleBackdropMouseLeave}
     >
       <div
         ref={modalRef}
@@ -660,15 +799,22 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
             }}>
               Дата и время встречи <span style={{color: 'red'}}>*</span>
             </label>
-            
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--center-channel-color-64, #999)',
+              marginBottom: '8px'
+            }}>
+              Время указывается в вашем локальном времени (браузера).
+            </div>
+
             {/* Поле выбора даты */}
             <div style={{marginBottom: '12px', position: 'relative'}}>
               <input
                 type="text"
-                value={selectedDate ? selectedDate.toLocaleDateString('ru-RU', { 
-                  day: '2-digit', 
-                  month: '2-digit', 
-                  year: 'numeric' 
+                value={selectedDate ? selectedDate.toLocaleDateString('ru-RU', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: 'numeric'
                 }) : ''}
                 onClick={() => setShowCalendar(!showCalendar)}
                 readOnly
@@ -686,7 +832,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
                 }}
               />
               {showCalendar && (
-                <div 
+                <div
                   ref={calendarRef}
                   style={{
                     position: 'absolute',
@@ -745,7 +891,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
             </div>
 
             {/* Селекты времени и пресеты */}
-            <TimeSelector 
+            <TimeSelector
               selectedHour={selectedHour}
               selectedMinute={selectedMinute}
               handleTimeChange={handleTimeChange}
@@ -753,11 +899,21 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
             />
 
             <TimePresets applyTimePreset={applyTimePreset} selectedQuick={selectedQuick} />
+
+            {/* Информация о таймзоне пользователя */}
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--center-channel-color-64, #999)',
+              marginTop: '8px',
+              fontStyle: 'italic'
+            }}>
+              Ваш часовой пояс (по данным браузера): {timezoneInfo.timeZone} ({timezoneInfo.offsetStr})
+            </div>
           </div>
 
           {/* Продолжительность */}
           <div className="form-section duration">
-            <DurationSelector 
+            <DurationSelector
               duration={duration}
               setDuration={setDuration}
               errors={errors}
@@ -805,7 +961,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
           {/* Участники - ленивая загрузка */}
           {showAdvanced && (
             <div className="form-section participants">
-              <ParticipantSelector 
+              <ParticipantSelector
               isDirectChannel={isDirectChannel}
               participantSearch={participantSearch}
               setParticipantSearch={setParticipantSearch}
@@ -823,8 +979,8 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
           {showAdvanced && (
             <div className="form-section notification-checkbox">
               <label className="checkbox-label">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={notifyParticipants}
                   onChange={(e) => setNotifyParticipants(e.target.checked)}
                 />
@@ -841,8 +997,8 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
           {showAdvanced && (
             <div className="form-section google-calendar-checkbox">
               <label className="checkbox-label">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={createGoogleEvent}
                   onChange={(e) => setCreateGoogleEvent(e.target.checked)}
                 />
@@ -917,4 +1073,3 @@ ScheduleMeetingModal.propTypes = {
 };
 
 export default ScheduleMeetingModal;
-
