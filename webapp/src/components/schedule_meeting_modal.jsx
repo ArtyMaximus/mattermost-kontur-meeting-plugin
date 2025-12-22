@@ -43,7 +43,6 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
   const [isSuccess, setIsSuccess] = useState(false);
   const [selectedQuick, setSelectedQuick] = useState(null);
   const [notifyParticipants, setNotifyParticipants] = useState(true);
-  const [createGoogleEvent, setCreateGoogleEvent] = useState(true);
   const [mouseDownOutside, setMouseDownOutside] = useState(false);
 
   const modalRef = useRef(null);
@@ -66,7 +65,6 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
     setIsSuccess(false);
     setSelectedQuick(null);
     setNotifyParticipants(true);
-    setCreateGoogleEvent(true);
     setShowAdvanced(false);
     setIsReady(false);
   };
@@ -431,7 +429,7 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
       [REQUEST_FIELDS.TITLE]: meetingTitle.trim() || null,
       [REQUEST_FIELDS.PARTICIPANT_IDS]: participants.map(p => p.id),
       notify_participants: notifyParticipants,
-      create_google_calendar_event: createGoogleEvent,
+      create_google_calendar_event: true,
       service_name: serviceName
     };
 
@@ -993,21 +991,19 @@ const ScheduleMeetingModal = ({channel, postId, rootId, onClose, onSuccess}) => 
             </div>
           )}
 
-          {/* Чекбокс Google Calendar - ленивая загрузка */}
+          {/* Информация о Google Calendar - ленивая загрузка */}
           {showAdvanced && (
-            <div className="form-section google-calendar-checkbox">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={createGoogleEvent}
-                  onChange={(e) => setCreateGoogleEvent(e.target.checked)}
-                />
-                <span className="checkbox-icon">📅</span>
-                <span>Создать событие в Google Календаре у всех</span>
-              </label>
-              <div className="field-hint">
-                Событие будет автоматически добавлено в Google Calendar всех участников
-              </div>
+            <div className="form-section google-calendar-info" style={{
+              marginTop: '12px',
+              padding: '10px 12px',
+              backgroundColor: 'var(--center-channel-color-04, #f8f9fa)',
+              borderRadius: '4px',
+              fontSize: '13px',
+              color: 'var(--center-channel-color-72, #555)',
+              lineHeight: '1.4'
+            }}>
+              <span style={{marginRight: '6px'}}>📅</span>
+              <span>В Google Calendar: участники получат событие автоматически через приглашение на почту, организатору добавится через n8n.</span>
             </div>
           )}
 
